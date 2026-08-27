@@ -4,3 +4,4 @@ export function confidenceBand(value:number){if(value>=0.9)return'HIGH';if(value
 export * from './router.js';
 export * from './openai-compatible.js';
 export * from './intent.js';
+export * from './confidence.js';
