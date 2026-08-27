@@ -8,6 +8,7 @@ COPY packages/shared/package.json packages/shared/package.json
 COPY packages/booking/package.json packages/booking/package.json
 COPY packages/ai/package.json packages/ai/package.json
 COPY packages/whatsapp/package.json packages/whatsapp/package.json
+COPY packages/inbox/package.json packages/inbox/package.json
 COPY packages/database/package.json packages/database/package.json
 COPY packages/auth/package.json packages/auth/package.json
 COPY packages/customers/package.json packages/customers/package.json

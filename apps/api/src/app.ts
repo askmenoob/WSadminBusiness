@@ -1,7 +1,7 @@
 import Fastify from 'fastify';
 import { Redis } from 'ioredis';
 import { CAPABILITIES, ROLES, AccessDeniedError, authorize, type Actor, type Capability, type Role } from '@wsadmin-business/auth';
-import { createCustomerRepository, createPool, createServiceOptionRepository,createServiceRepository, createStaffRepository, createStaffScheduleRepository, createResourceRepository, createAvailabilityRepository, createBookingPolicyRepository,createBookingRepository, createCalendarControlRepository,createCalendarRepository, createDashboardRepository,createLocationRepository,createWhatsAppInstanceRepository,createWhatsAppProviderEventRepository, probeDatabase } from '@wsadmin-business/database';
+import { createCustomerRepository, createPool, createServiceOptionRepository,createServiceRepository, createStaffRepository, createStaffScheduleRepository, createResourceRepository, createAvailabilityRepository, createBookingPolicyRepository,createBookingRepository, createCalendarControlRepository,createCalendarRepository, createDashboardRepository,createLocationRepository,createWhatsAppInstanceRepository,createWhatsAppProviderEventRepository,createInboxRepository, probeDatabase } from '@wsadmin-business/database';
 import { registerCustomerRoutes } from './customer-routes.js';
 import { registerServiceRoutes } from './service-routes.js';
 import { registerServiceOptionRoutes } from './service-option-routes.js';
@@ -14,12 +14,13 @@ import { registerBookingPolicyRoutes } from './booking-policy-routes.js';
 import { registerCalendarRoutes } from './calendar-routes.js';
 import { registerCalendarControlRoutes } from './calendar-control-routes.js';
 import { registerDashboardRoutes } from './dashboard-routes.js';
+import { registerInboxRoutes } from './inbox-routes.js';
 import { registerLocationRoutes } from './location-routes.js';
 import { createWhatsAppConnectionProviderFromEnv } from '@wsadmin-business/whatsapp';
 import { registerWhatsAppInstanceRoutes } from './whatsapp-instance-routes.js';
 import { createEvolutionWebhookVerifier,registerEvolutionWebhookRoutes } from './evolution-webhook-routes.js';
 import { readFileSync } from 'node:fs';
-export function buildApp(options:{enableDevRbacProbe?:boolean;customerRepository?:import('@wsadmin-business/customers').CustomerRepository;serviceRepository?:import('@wsadmin-business/services').ServiceRepository;staffRepository?:import('@wsadmin-business/staff').StaffRepository;staffScheduleRepository?:import('@wsadmin-business/staff').StaffScheduleRepository;resourceRepository?:import('@wsadmin-business/resources').ResourceRepository;availabilityRepository?:import('@wsadmin-business/availability').AvailabilityRepository;bookingRepository?:import('@wsadmin-business/booking').BookingRepository;calendarRepository?:import('@wsadmin-business/calendar').CalendarRepository;dashboardRepository?:import('@wsadmin-business/dashboard').DashboardRepository;whatsappInstanceRepository?:import('@wsadmin-business/whatsapp').WhatsAppInstanceRepository;whatsappConnectionProvider?:import('@wsadmin-business/whatsapp').WhatsAppConnectionProvider}={}) {
+export function buildApp(options:{enableDevRbacProbe?:boolean;customerRepository?:import('@wsadmin-business/customers').CustomerRepository;serviceRepository?:import('@wsadmin-business/services').ServiceRepository;staffRepository?:import('@wsadmin-business/staff').StaffRepository;staffScheduleRepository?:import('@wsadmin-business/staff').StaffScheduleRepository;resourceRepository?:import('@wsadmin-business/resources').ResourceRepository;availabilityRepository?:import('@wsadmin-business/availability').AvailabilityRepository;bookingRepository?:import('@wsadmin-business/booking').BookingRepository;calendarRepository?:import('@wsadmin-business/calendar').CalendarRepository;dashboardRepository?:import('@wsadmin-business/dashboard').DashboardRepository;inboxRepository?:import('@wsadmin-business/inbox').InboxRepository;whatsappInstanceRepository?:import('@wsadmin-business/whatsapp').WhatsAppInstanceRepository;whatsappConnectionProvider?:import('@wsadmin-business/whatsapp').WhatsAppConnectionProvider}={}) {
   const app = Fastify({ logger: false });
   const pool = createPool();
   const redis = new Redis(process.env.REDIS_URL ?? 'redis://127.0.0.1:56379/0',{lazyConnect:true,maxRetriesPerRequest:2});
@@ -41,7 +42,9 @@ export function buildApp(options:{enableDevRbacProbe?:boolean;customerRepository
   registerLocationRoutes(app,createLocationRepository(pool));
   registerWhatsAppInstanceRoutes(app,options.whatsappInstanceRepository??createWhatsAppInstanceRepository(pool),options.whatsappConnectionProvider??createWhatsAppConnectionProviderFromEnv());
   let webhookSecret=process.env.EVOLUTION_WEBHOOK_TOKEN;const webhookFile=process.env.EVOLUTION_WEBHOOK_TOKEN_FILE;if(!webhookSecret&&webhookFile){try{webhookSecret=readFileSync(webhookFile,'utf8').trim();}catch{webhookSecret=undefined;}}
-  registerEvolutionWebhookRoutes(app,createWhatsAppProviderEventRepository(pool),createEvolutionWebhookVerifier(webhookSecret));
+  const inboxRepository=options.inboxRepository??createInboxRepository(pool);
+  registerEvolutionWebhookRoutes(app,createWhatsAppProviderEventRepository(pool),createEvolutionWebhookVerifier(webhookSecret),inboxRepository);
+  registerInboxRoutes(app,inboxRepository);
   if(options.enableDevRbacProbe){app.get('/api/v1/dev/rbac',async(request,reply)=>{const headers=request.headers;const role=String(headers['x-wsadmin-role']??'') as Role;const tenantId=String(headers['x-wsadmin-tenant-id']??'');const targetTenantId=String(headers['x-wsadmin-target-tenant-id']??tenantId);const capability=String(headers['x-wsadmin-capability']??'TENANT_READ') as Capability;if(!ROLES.includes(role)||!CAPABILITIES.includes(capability)||(!tenantId&&role!=='SYSTEM_OWNER'))return reply.code(400).send({error:'invalid_dev_actor'});const actor:Actor={userId:String(headers['x-wsadmin-user-id']??'dev-user'),role,...(tenantId?{tenantId}:{})};try{authorize(actor,targetTenantId,capability);return{allowed:true,role,tenantId:targetTenantId,capability};}catch(error){if(error instanceof AccessDeniedError)return reply.code(403).send({allowed:false,error:error.message});throw error;}});}
   app.addHook('onClose',async()=>{await pool.end();redis.disconnect();});
   return app;

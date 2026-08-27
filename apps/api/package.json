@@ -23,7 +23,8 @@
     "@wsadmin-business/dashboard": "*",
     "@wsadmin-business/booking-policy": "*",
     "@wsadmin-business/locations": "*",
-    "@wsadmin-business/whatsapp": "*"
+    "@wsadmin-business/whatsapp": "*",
+    "@wsadmin-business/inbox": "*"
   },
   "devDependencies": {
     "@types/node": "^26.4.0",

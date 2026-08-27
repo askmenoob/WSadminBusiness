@@ -26,5 +26,5 @@ export function normalizeEvolutionWebhook(payload:unknown):NormalizedWhatsAppEve
 }
 export class WhatsAppWebhookIngestionService{
  constructor(private readonly repo:WhatsAppProviderEventRepository){}
- async ingestEvolution(payload:unknown){const event=normalizeEvolutionWebhook(payload);const instance=await this.repo.resolveInstance(event.provider,event.providerInstanceName);if(!instance)throw new WhatsAppWebhookError('Unknown provider instance','unknown_instance');return this.repo.ingest(instance,event,payload);}
+ async ingestEvolution(payload:unknown){const event=normalizeEvolutionWebhook(payload);const instance=await this.repo.resolveInstance(event.provider,event.providerInstanceName);if(!instance)throw new WhatsAppWebhookError('Unknown provider instance','unknown_instance');const stored=await this.repo.ingest(instance,event,payload);return{...stored,event};}
 }
