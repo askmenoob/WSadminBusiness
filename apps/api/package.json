@@ -1,6 +1,22 @@
 {
-  "name":"@wsadmin-business/api","private":true,"type":"module",
-  "scripts":{"dev":"tsx watch src/server.ts","start":"tsx src/server.ts","typecheck":"tsc --noEmit"},
-  "dependencies":{"@wsadmin-business/database":"*","fastify":"^5.6.0","ioredis":"^5.7.0"},
-  "devDependencies":{"@types/node":"^26.4.0","tsx":"^4.20.0","typescript":"^5.9.0"}
+  "name": "@wsadmin-business/api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test src/*.test.ts"
+  },
+  "dependencies": {
+    "@wsadmin-business/database": "*",
+    "fastify": "^5.6.0",
+    "ioredis": "^5.7.0",
+    "@wsadmin-business/auth": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  }
 }

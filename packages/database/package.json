@@ -1,6 +1,19 @@
 {
-  "name":"@wsadmin-business/database","private":true,"type":"module","exports":"./src/index.ts",
-  "scripts":{"typecheck":"tsc --noEmit"},
-  "dependencies":{"pg":"^8.16.0"},
-  "devDependencies":{"@types/node":"^26.4.0","@types/pg":"^8.15.0","typescript":"^5.9.0"}
+  "name": "@wsadmin-business/database",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "migrate": "tsx src/migrate.ts"
+  },
+  "dependencies": {
+    "pg": "^8.16.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.0",
+    "@types/pg": "^8.15.0",
+    "typescript": "^5.9.0",
+    "tsx": "^4.20.0"
+  }
 }

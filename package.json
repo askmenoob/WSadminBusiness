@@ -2,7 +2,10 @@
   "name": "wsadmin-business",
   "private": true,
   "version": "0.1.0",
-  "workspaces": ["apps/*", "packages/*"],
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "dev:api": "npm run dev -w @wsadmin-business/api",
     "dev:web": "npm run dev -w @wsadmin-business/web",
@@ -11,6 +14,7 @@
     "test": "npm run test --workspaces --if-present",
     "build": "npm run build --workspaces --if-present",
     "check:secrets": "node scripts/check-secrets.mjs",
-    "check": "npm run check:secrets && npm run typecheck && npm test"
+    "check": "npm run check:secrets && npm run typecheck && npm test",
+    "db:migrate": "npm run migrate -w @wsadmin-business/database"
   }
 }
