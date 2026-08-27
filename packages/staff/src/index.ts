@@ -36,3 +36,4 @@ export class StaffDirectory{
   async setServices(tenantId:string,staffId:string,serviceIds:string[]){await this.getStaff(tenantId,staffId);return this.repo.setStaffServices(tenantId,staffId,[...new Set(serviceIds)]);}
   async assertEligible(tenantId:string,staffId:string,serviceId:string){if(!(await this.repo.isEligibleForService(tenantId,staffId,serviceId)))throw new StaffConflictError('staff is not assigned to this service');return true;}
 }
+export * from './schedule.js';
