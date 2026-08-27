@@ -15,6 +15,10 @@
     "build": "npm run build --workspaces --if-present",
     "check:secrets": "node scripts/check-secrets.mjs",
     "check": "npm run check:secrets && npm run typecheck && npm test",
-    "db:migrate": "npm run migrate -w @wsadmin-business/database"
+    "db:migrate": "npm run migrate -w @wsadmin-business/database",
+    "test:booking-core:db": "tsx scripts/booking-core-acceptance.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.0"
   }
 }
