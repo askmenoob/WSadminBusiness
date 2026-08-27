@@ -60,11 +60,13 @@ services:
     environment:
       EVOLUTION_BASE_URL: http://evolution:8080
       EVOLUTION_API_KEY_FILE: /run/secrets/evolution_api_key
-    secrets: [evolution_api_key]
+      EVOLUTION_WEBHOOK_TOKEN_FILE: /run/secrets/evolution_webhook_token
+    secrets: [evolution_api_key,evolution_webhook_token]
     depends_on:
       evolution: {condition: service_healthy}
 secrets:
   evolution_api_key: {file: ./.secrets/evolution_api_key}
+  evolution_webhook_token: {file: ./.secrets/evolution_webhook_token}
   evolution_postgres_password: {file: ./.secrets/evolution_postgres_password}
   evolution_redis_password: {file: ./.secrets/evolution_redis_password}
 volumes:

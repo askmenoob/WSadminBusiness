@@ -2,3 +2,4 @@ export interface WhatsAppProvider { readonly providerName:string; sendText(input
 export const WHATSAPP_PROVIDER_POLICY = 'provider-neutral-business-services' as const;
 export * from './connections.js';
 export * from './evolution.js';
+export * from './webhooks.js';

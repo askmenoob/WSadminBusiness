@@ -21,3 +21,4 @@ export { createCalendarControlRepository } from './calendar-controls.js';
 export { createServiceOptionRepository } from './service-options.js';
 export { createLocationRepository } from './locations.js';
 export { createWhatsAppInstanceRepository } from './whatsapp-instances.js';
+export { createWhatsAppProviderEventRepository } from './whatsapp-provider-events.js';
