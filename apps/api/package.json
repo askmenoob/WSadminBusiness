@@ -21,7 +21,8 @@
     "@wsadmin-business/booking": "*",
     "@wsadmin-business/calendar": "*",
     "@wsadmin-business/dashboard": "*",
-    "@wsadmin-business/booking-policy": "*"
+    "@wsadmin-business/booking-policy": "*",
+    "@wsadmin-business/locations": "*"
   },
   "devDependencies": {
     "@types/node": "^26.4.0",

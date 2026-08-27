@@ -1,12 +1,12 @@
 export const RESOURCE_TYPES=['ROOM','PROPERTY','EQUIPMENT','CHAIR','BAY','VEHICLE','OTHER'] as const;
 export type ResourceType=(typeof RESOURCE_TYPES)[number];
 export type Resource={
-  id:string;tenantId:string;name:string;type:ResourceType;capacity:number;active:boolean;sortOrder:number;
+  id:string;tenantId:string;locationId:string|null;name:string;type:ResourceType;capacity:number;active:boolean;sortOrder:number;
   description:string|null;createdAt:Date;updatedAt:Date;
 };
-export type CreateResourceInput={name:string;type:ResourceType;capacity?:number;active?:boolean;sortOrder?:number;description?:string|null};
+export type CreateResourceInput={locationId?:string|null;name:string;type:ResourceType;capacity?:number;active?:boolean;sortOrder?:number;description?:string|null};
 export type UpdateResourceInput=Partial<CreateResourceInput>;
-export type ResourceSearch={q?:string;type?:ResourceType;active?:boolean;serviceId?:string;limit?:number;offset?:number};
+export type ResourceSearch={locationId?:string;q?:string;type?:ResourceType;active?:boolean;serviceId?:string;limit?:number;offset?:number};
 export type ResourceServiceAssignment={serviceId:string;allocationPriority:number};
 export interface ResourceRepository{
   create(tenantId:string,input:CreateResourceInput):Promise<Resource>;

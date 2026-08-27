@@ -3,7 +3,7 @@ import { AvailabilityEngine,type AvailabilityRepository } from './index.js';
 import { DEFAULT_BOOKING_POLICY } from '@wsadmin-business/booking-policy';
 class Repo implements AvailabilityRepository{
   staffBusy=0;resourceBusy=0;blocks:any[]=[];controlBlocks:any[]=[];off=false;policy={...DEFAULT_BOOKING_POLICY,minimumLeadMinutes:0,bookingHorizonDays:365};
-  async getTenantTimezone(){return'Asia/Kuala_Lumpur';}
+  async getTenantTimezone(){return'Asia/Kuala_Lumpur';}async getLocation(_t:string,id:string){return{id,timezone:null,active:true};}async isServiceAtLocation(){return true;}
   async getBookingPolicy(){return this.policy;}
   async getService(){return{id:'svc',active:true,durationMinutes:60,bufferBeforeMinutes:15,bufferAfterMinutes:15,priceMinor:10000,currency:'MYR'};}async getServiceOptionConfiguration(){return{groups:[],options:[]};}
   async listEligibleStaff(){return[{id:'staff',active:true,bookingCapacity:1,sortOrder:0,displayName:'Aina',photoUrl:'https://example.test/aina.jpg'}];}

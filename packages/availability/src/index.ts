@@ -10,19 +10,21 @@ export type AvailabilityControlBlock={startsAt:Date;endsAt:Date;type:'STOP_SALE'
 export type BusyCountQuery={tenantId:string;staffId?:string;resourceId?:string;startsAt:Date;endsAt:Date;excludeBookingId?:string};
 export interface AvailabilityRepository{
   getTenantTimezone(tenantId:string):Promise<string>;
+  getLocation(tenantId:string,locationId:string):Promise<{id:string;timezone:string|null;active:boolean}|null>;
+  isServiceAtLocation(tenantId:string,serviceId:string,locationId:string):Promise<boolean>;
   getBookingPolicy(tenantId:string):Promise<BookingPolicy>;
   getService(tenantId:string,serviceId:string):Promise<AvailabilityService|null>;
   getServiceOptionConfiguration(tenantId:string,serviceId:string):Promise<{groups:ServiceOptionGroup[];options:ServiceOption[]}>;
-  listEligibleStaff(tenantId:string,serviceId:string,staffId?:string):Promise<AvailabilityStaff[]>;
+  listEligibleStaff(tenantId:string,serviceId:string,staffId?:string,locationId?:string):Promise<AvailabilityStaff[]>;
   getWeeklyHours(tenantId:string,staffId:string):Promise<WeeklyHours[]>;
   getShiftOverrides(tenantId:string,staffId:string,localDate:string):Promise<ShiftOverride[]>;
   getTimeBlocks(tenantId:string,staffId:string,startsAt:Date,endsAt:Date):Promise<TimeBlock[]>;
   getCalendarBlocks(tenantId:string,staffId:string,resourceId:string|null,startsAt:Date,endsAt:Date):Promise<AvailabilityControlBlock[]>;
-  listCompatibleResources(tenantId:string,serviceId:string,resourceId?:string,requiredResourceType?:string|null):Promise<AvailabilityResource[]>;
+  listCompatibleResources(tenantId:string,serviceId:string,resourceId?:string,requiredResourceType?:string|null,locationId?:string):Promise<AvailabilityResource[]>;
   countBusyBookings(query:BusyCountQuery):Promise<number>;
 }
-export type AvailabilityRequest={tenantId:string;serviceId:string;startsAt:Date|string;staffId?:string;resourceId?:string;optionIds?:string[];excludeBookingId?:string};
-export type AvailabilityCandidate={staffId:string;staffDisplayName:string;staffPhotoUrl:string|null;staffSortOrder:number;staffBusy:number;staffCapacity:number;resourceId:string|null;resourceAllocationPriority:number|null;optionIds:string[];durationMinutes:number;basePriceMinor:number;optionPriceMinor:number;priceMinor:number;currency:string;startsAt:Date;endsAt:Date;effectiveStartsAt:Date;effectiveEndsAt:Date};
+export type AvailabilityRequest={tenantId:string;locationId?:string;serviceId:string;startsAt:Date|string;staffId?:string;resourceId?:string;optionIds?:string[];excludeBookingId?:string};
+export type AvailabilityCandidate={locationId:string|null;staffId:string;staffDisplayName:string;staffPhotoUrl:string|null;staffSortOrder:number;staffBusy:number;staffCapacity:number;resourceId:string|null;resourceAllocationPriority:number|null;optionIds:string[];durationMinutes:number;basePriceMinor:number;optionPriceMinor:number;priceMinor:number;currency:string;startsAt:Date;endsAt:Date;effectiveStartsAt:Date;effectiveEndsAt:Date};
 export type AvailabilityResult={available:boolean;reason?:string;candidates:AvailabilityCandidate[]};
 export class AvailabilityValidationError extends Error{constructor(message:string){super(message);this.name='AvailabilityValidationError';}}
 function overlap(aStart:Date,aEnd:Date,bStart:Date,bEnd:Date){return aStart<bEnd&&bStart<aEnd;}
@@ -42,7 +44,9 @@ export class AvailabilityEngine{
   async check(input:AvailabilityRequest):Promise<AvailabilityResult>{
     const startsAt=input.startsAt instanceof Date?input.startsAt:new Date(input.startsAt);
     if(Number.isNaN(startsAt.valueOf()))throw new AvailabilityValidationError('startsAt must be a valid date-time');
-    const timeZone=await this.repo.getTenantTimezone(input.tenantId);
+    const tenantTimezone=await this.repo.getTenantTimezone(input.tenantId);
+    let timeZone=tenantTimezone;
+    if(input.locationId){const location=await this.repo.getLocation(input.tenantId,input.locationId);if(!location||!location.active)return{available:false,reason:'location_unavailable',candidates:[]};timeZone=location.timezone??tenantTimezone;if(!(await this.repo.isServiceAtLocation(input.tenantId,input.serviceId,input.locationId)))return{available:false,reason:'location_service_unavailable',candidates:[]};}
     const policy=await this.repo.getBookingPolicy(input.tenantId);
     const policyDecision=evaluateBookingStart({startsAt,now:this.clock(),timeZone,policy});
     if(!policyDecision.allowed)return{available:false,reason:`policy_${policyDecision.reason}`,candidates:[]};
@@ -58,9 +62,9 @@ export class AvailabilityEngine{
     const effectiveStartsAt=new Date(startsAt.getTime()-service.bufferBeforeMinutes*60000);
     const effectiveEndsAt=new Date(endsAt.getTime()+service.bufferAfterMinutes*60000);
     const local=localParts(startsAt,timeZone);
-    const staff=await this.repo.listEligibleStaff(input.tenantId,input.serviceId,input.staffId);
+    const staff=await this.repo.listEligibleStaff(input.tenantId,input.serviceId,input.staffId,input.locationId);
     if(!staff.length)return{available:false,reason:'no_eligible_staff',candidates:[]};
-    const compatible=await this.repo.listCompatibleResources(input.tenantId,input.serviceId,input.resourceId,selected.requiredResourceType);
+    const compatible=await this.repo.listCompatibleResources(input.tenantId,input.serviceId,input.resourceId,selected.requiredResourceType,input.locationId);
     if(input.resourceId&&compatible.length===0)return{available:false,reason:'resource_incompatible',candidates:[]};
     const resources:AvailabilityResource[]|[null]=compatible.length?compatible:[null];
     const candidates:AvailabilityCandidate[]=[];
@@ -88,7 +92,7 @@ export class AvailabilityEngine{
           const resourceBusy=await this.repo.countBusyBookings({tenantId:input.tenantId,resourceId:resource.id,startsAt:effectiveStartsAt,endsAt:effectiveEndsAt,excludeBookingId:input.excludeBookingId});
           if(resourceBusy>=resource.capacity)continue;
         }
-        candidates.push({staffId:person.id,staffDisplayName:person.displayName,staffPhotoUrl:person.photoUrl,staffSortOrder:person.sortOrder,staffBusy,staffCapacity:person.bookingCapacity,resourceId:resource?.id??null,resourceAllocationPriority:resource?.allocationPriority??null,optionIds:selected.optionIds,durationMinutes,basePriceMinor:service.priceMinor,optionPriceMinor,priceMinor,currency:service.currency,startsAt,endsAt,effectiveStartsAt,effectiveEndsAt});
+        candidates.push({locationId:input.locationId??null,staffId:person.id,staffDisplayName:person.displayName,staffPhotoUrl:person.photoUrl,staffSortOrder:person.sortOrder,staffBusy,staffCapacity:person.bookingCapacity,resourceId:resource?.id??null,resourceAllocationPriority:resource?.allocationPriority??null,optionIds:selected.optionIds,durationMinutes,basePriceMinor:service.priceMinor,optionPriceMinor,priceMinor,currency:service.currency,startsAt,endsAt,effectiveStartsAt,effectiveEndsAt});
       }
     }
     return candidates.length?{available:true,candidates}:{available:false,reason:'no_capacity',candidates:[]};
