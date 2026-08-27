@@ -13,7 +13,19 @@ export function createCalendarRepository(pool:Pool):CalendarRepository{return{
     let blocks:CalendarBlockItem[]=[];
     if(view==='staff'){
       const blockRows=await pool.query(`SELECT id,staff_id,type,starts_at,ends_at,reason FROM staff_time_blocks WHERE tenant_id=$1 AND starts_at<$3 AND $2<ends_at ORDER BY starts_at,id`,[tenantId,from,to]);
-      blocks=blockRows.rows.map((b:any)=>({id:b.id,rowId:b.staff_id,type:b.type,startsAt:b.starts_at,endsAt:b.ends_at,reason:b.reason}));
+      blocks=blockRows.rows.map((b:any)=>({id:b.id,rowId:b.staff_id,type:b.type,startsAt:b.starts_at,endsAt:b.ends_at,reason:b.reason,source:'STAFF_TIME' as const,recurrence:'NONE' as const}));
+    }
+    const controlRows=await pool.query(`WITH candidates AS (
+      SELECT *,CASE recurrence WHEN 'DAILY' THEN interval '1 day' WHEN 'WEEKLY' THEN interval '7 days' ELSE NULL END AS step FROM calendar_blocks
+      WHERE tenant_id=$1 AND (scope='TENANT' OR ($4='staff' AND scope='STAFF') OR ($4='resource' AND scope='RESOURCE')) AND starts_at<$3 AND (recurrence='NONE' OR recurrence_until IS NULL OR recurrence_until >= $2)
+    ), expanded AS (
+      SELECT id,scope,staff_id,resource_id,type,recurrence,reason,starts_at AS occurrence_start,ends_at AS occurrence_end FROM candidates WHERE recurrence='NONE'
+      UNION ALL
+      SELECT c.id,c.scope,c.staff_id,c.resource_id,c.type,c.recurrence,c.reason,gs,gs+(c.ends_at-c.starts_at) FROM candidates c CROSS JOIN LATERAL generate_series(c.starts_at,LEAST(COALESCE(c.recurrence_until,$3),$3),c.step) gs WHERE c.recurrence<>'NONE'
+    ) SELECT * FROM expanded WHERE occurrence_start<$3 AND $2<occurrence_end ORDER BY occurrence_start,id`,[tenantId,from,to,view]);
+    for(const b of controlRows.rows){
+      const targets=b.scope==='TENANT'?rows.map(r=>r.id):[view==='staff'?b.staff_id:b.resource_id].filter(Boolean);
+      for(const rowId of targets){blocks.push({id:`${b.id}:${rowId}:${new Date(b.occurrence_start).toISOString()}`,rowId,type:b.type,startsAt:b.occurrence_start,endsAt:b.occurrence_end,reason:b.reason,source:'CALENDAR_CONTROL',recurrence:b.recurrence});}
     }
     return{tenantId,view,from,to,rows,bookings,blocks};
   }

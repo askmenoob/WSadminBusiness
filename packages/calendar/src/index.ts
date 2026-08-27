@@ -1,7 +1,7 @@
 export type CalendarView='staff'|'resource';
 export type CalendarRow={id:string;name:string;kind:'STAFF'|'RESOURCE';capacity:number;photoUrl:string|null;resourceType:string|null};
 export type CalendarBookingItem={id:string;rowId:string|null;status:string;startsAt:Date;endsAt:Date;customerId:string|null;customerName:string|null;serviceId:string;serviceName:string;staffId:string;staffName:string;resourceId:string|null;resourceName:string|null};
-export type CalendarBlockItem={id:string;rowId:string;type:'LEAVE'|'BLOCKED';startsAt:Date;endsAt:Date;reason:string|null};
+export type CalendarBlockItem={id:string;rowId:string;type:'LEAVE'|'BLOCKED'|'STOP_SALE';startsAt:Date;endsAt:Date;reason:string|null;source?:'STAFF_TIME'|'CALENDAR_CONTROL';recurrence?:'NONE'|'DAILY'|'WEEKLY'};
 export type CalendarSnapshot={tenantId:string;view:CalendarView;from:Date;to:Date;rows:CalendarRow[];bookings:CalendarBookingItem[];blocks:CalendarBlockItem[]};
 export interface CalendarRepository{snapshot(tenantId:string,view:CalendarView,from:Date,to:Date):Promise<CalendarSnapshot>;}
 export class CalendarValidationError extends Error{constructor(message:string){super(message);this.name='CalendarValidationError';}}
@@ -15,3 +15,4 @@ export class CalendarService{
     return this.repo.snapshot(tenantId,view,from,to);
   }
 }
+export * from './controls.js';

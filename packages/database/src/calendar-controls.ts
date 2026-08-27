@@ -1,0 +1,7 @@
+import type{Pool}from'pg';import type{CalendarControlBlock,CalendarControlRepository}from'@wsadmin-business/calendar';
+const map=(r:any):CalendarControlBlock=>({id:r.id,tenantId:r.tenant_id,scope:r.scope,staffId:r.staff_id,resourceId:r.resource_id,type:r.type,startsAt:r.starts_at,endsAt:r.ends_at,recurrence:r.recurrence,recurrenceUntil:r.recurrence_until,reason:r.reason,createdByUserId:r.created_by_user_id,createdAt:r.created_at});
+export function createCalendarControlRepository(pool:Pool):CalendarControlRepository{return{
+  async create(t,i){const r=await pool.query(`INSERT INTO calendar_blocks(tenant_id,scope,staff_id,resource_id,type,starts_at,ends_at,recurrence,recurrence_until,reason,created_by_user_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,[t,i.scope,i.staffId??null,i.resourceId??null,i.type??'STOP_SALE',i.startsAt,i.endsAt,i.recurrence??'NONE',i.recurrenceUntil??null,i.reason??null,i.createdByUserId??null]);return map(r.rows[0]);},
+  async remove(t,id){const r=await pool.query('DELETE FROM calendar_blocks WHERE tenant_id=$1 AND id=$2',[t,id]);return Number(r.rowCount)>0;},
+  async list(t,from,to){const r=await pool.query(`SELECT * FROM calendar_blocks WHERE tenant_id=$1 AND starts_at<$3 AND (recurrence='NONE' AND $2<ends_at OR recurrence<>'NONE' AND (recurrence_until IS NULL OR $2<=recurrence_until)) ORDER BY starts_at,id`,[t,from,to]);return r.rows.map(map);}
+};}

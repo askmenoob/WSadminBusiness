@@ -5,6 +5,7 @@ export type AvailabilityResource={id:string;active:boolean;capacity:number};
 export type WeeklyHours={weekday:number;startMinute:number;endMinute:number};
 export type ShiftOverride={localDate:string;startMinute:number|null;endMinute:number|null;isOff:boolean};
 export type TimeBlock={startsAt:Date;endsAt:Date};
+export type AvailabilityControlBlock={startsAt:Date;endsAt:Date;type:'STOP_SALE'|'BLOCKED'};
 export type BusyCountQuery={tenantId:string;staffId?:string;resourceId?:string;startsAt:Date;endsAt:Date;excludeBookingId?:string};
 export interface AvailabilityRepository{
   getTenantTimezone(tenantId:string):Promise<string>;
@@ -15,6 +16,7 @@ export interface AvailabilityRepository{
   getWeeklyHours(tenantId:string,staffId:string):Promise<WeeklyHours[]>;
   getShiftOverrides(tenantId:string,staffId:string,localDate:string):Promise<ShiftOverride[]>;
   getTimeBlocks(tenantId:string,staffId:string,startsAt:Date,endsAt:Date):Promise<TimeBlock[]>;
+  getCalendarBlocks(tenantId:string,staffId:string,resourceId:string|null,startsAt:Date,endsAt:Date):Promise<AvailabilityControlBlock[]>;
   listCompatibleResources(tenantId:string,serviceId:string,resourceId?:string):Promise<AvailabilityResource[]>;
   countBusyBookings(query:BusyCountQuery):Promise<number>;
 }
@@ -72,6 +74,8 @@ export class AvailabilityEngine{
       const staffBusy=await this.repo.countBusyBookings({tenantId:input.tenantId,staffId:person.id,startsAt:effectiveStartsAt,endsAt:effectiveEndsAt,excludeBookingId:input.excludeBookingId});
       if(staffBusy>=person.bookingCapacity)continue;
       for(const resource of resources){
+        const controlBlocks=await this.repo.getCalendarBlocks(input.tenantId,person.id,resource?.id??null,effectiveStartsAt,effectiveEndsAt);
+        if(controlBlocks.some(b=>overlap(effectiveStartsAt,effectiveEndsAt,b.startsAt,b.endsAt)))continue;
         if(resource){
           if(!resource.active)continue;
           const resourceBusy=await this.repo.countBusyBookings({tenantId:input.tenantId,resourceId:resource.id,startsAt:effectiveStartsAt,endsAt:effectiveEndsAt,excludeBookingId:input.excludeBookingId});
