@@ -1,0 +1,8 @@
+import test from'node:test';import assert from'node:assert/strict';import{buildApp}from'./app.js';
+import{DEFAULT_BOOKING_POLICY,type BookingPolicy,type BookingPolicyRepository}from'@wsadmin-business/booking-policy';
+process.env.DATABASE_URL??='postgresql://invalid:invalid@127.0.0.1:1/invalid';
+class Repo implements BookingPolicyRepository{policy:BookingPolicy={...DEFAULT_BOOKING_POLICY};async get(){return this.policy;}async upsert(_t:string,p:BookingPolicy){this.policy=p;return p;}}
+import Fastify from'fastify';import{registerBookingPolicyRoutes}from'./booking-policy-routes.js';
+const owner={'x-wsadmin-role':'TENANT_OWNER','x-wsadmin-tenant-id':'t1','x-wsadmin-user-id':'u1'};
+test('booking policy API reads and updates tenant rules',async()=>{const repo=new Repo(),app=Fastify();registerBookingPolicyRoutes(app,repo);let r=await app.inject({method:'GET',url:'/api/v1/tenants/t1/booking-policy',headers:owner});assert.equal(r.statusCode,200);r=await app.inject({method:'PATCH',url:'/api/v1/tenants/t1/booking-policy',headers:owner,payload:{slotIntervalMinutes:30,minimumLeadMinutes:120}});assert.equal(r.statusCode,200);assert.equal(r.json().slotIntervalMinutes,30);assert.equal(repo.policy.minimumLeadMinutes,120);await app.close();});
+test('booking policy API validates and blocks cross tenant write',async()=>{const repo=new Repo(),app=Fastify();registerBookingPolicyRoutes(app,repo);let r=await app.inject({method:'PATCH',url:'/api/v1/tenants/t1/booking-policy',headers:owner,payload:{slotIntervalMinutes:7}});assert.equal(r.statusCode,400);r=await app.inject({method:'PATCH',url:'/api/v1/tenants/t2/booking-policy',headers:owner,payload:{slotIntervalMinutes:30}});assert.equal(r.statusCode,403);await app.close();});

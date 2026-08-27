@@ -1,3 +1,4 @@
+import { evaluateBookingStart,type BookingPolicy } from '@wsadmin-business/booking-policy';
 export type AvailabilityService={id:string;active:boolean;durationMinutes:number;bufferBeforeMinutes:number;bufferAfterMinutes:number};
 export type AvailabilityStaff={id:string;active:boolean;bookingCapacity:number};
 export type AvailabilityResource={id:string;active:boolean;capacity:number};
@@ -7,6 +8,8 @@ export type TimeBlock={startsAt:Date;endsAt:Date};
 export type BusyCountQuery={tenantId:string;staffId?:string;resourceId?:string;startsAt:Date;endsAt:Date;excludeBookingId?:string};
 export interface AvailabilityRepository{
   getTenantTimezone(tenantId:string):Promise<string>;
+  getBookingPolicy(tenantId:string):Promise<BookingPolicy>;
+  getBookingPolicy(tenantId:string):Promise<BookingPolicy>;
   getService(tenantId:string,serviceId:string):Promise<AvailabilityService|null>;
   listEligibleStaff(tenantId:string,serviceId:string,staffId?:string):Promise<AvailabilityStaff[]>;
   getWeeklyHours(tenantId:string,staffId:string):Promise<WeeklyHours[]>;
@@ -32,16 +35,19 @@ function windowFits(start:Date,end:Date,timeZone:string,intervals:{startMinute:n
   return intervals.some(x=>a.minute>=x.startMinute&&(b.minute+1)<=x.endMinute);
 }
 export class AvailabilityEngine{
-  constructor(private readonly repo:AvailabilityRepository){}
+  constructor(private readonly repo:AvailabilityRepository,private readonly clock:()=>Date=()=>new Date()){}
   async check(input:AvailabilityRequest):Promise<AvailabilityResult>{
     const startsAt=input.startsAt instanceof Date?input.startsAt:new Date(input.startsAt);
     if(Number.isNaN(startsAt.valueOf()))throw new AvailabilityValidationError('startsAt must be a valid date-time');
+    const timeZone=await this.repo.getTenantTimezone(input.tenantId);
+    const policy=await this.repo.getBookingPolicy(input.tenantId);
+    const policyDecision=evaluateBookingStart({startsAt,now:this.clock(),timeZone,policy});
+    if(!policyDecision.allowed)return{available:false,reason:`policy_${policyDecision.reason}`,candidates:[]};
     const service=await this.repo.getService(input.tenantId,input.serviceId);
     if(!service||!service.active)return{available:false,reason:'service_unavailable',candidates:[]};
     const endsAt=new Date(startsAt.getTime()+service.durationMinutes*60000);
     const effectiveStartsAt=new Date(startsAt.getTime()-service.bufferBeforeMinutes*60000);
     const effectiveEndsAt=new Date(endsAt.getTime()+service.bufferAfterMinutes*60000);
-    const timeZone=await this.repo.getTenantTimezone(input.tenantId);
     const local=localParts(startsAt,timeZone);
     const staff=await this.repo.listEligibleStaff(input.tenantId,input.serviceId,input.staffId);
     if(!staff.length)return{available:false,reason:'no_eligible_staff',candidates:[]};

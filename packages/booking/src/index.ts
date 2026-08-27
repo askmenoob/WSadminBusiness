@@ -1,4 +1,5 @@
 import { AvailabilityEngine,type AvailabilityRepository } from '@wsadmin-business/availability';
+import { cancellationAllowed } from '@wsadmin-business/booking-policy';
 export type BookingIntent='BOOK'|'RESCHEDULE'|'CANCEL'|'AVAILABILITY';
 export const BOOKING_CORE_RULE='deterministic-domain-service' as const;
 export type BookingStatus='PENDING'|'CONFIRMED'|'CANCELLED'|'COMPLETED'|'NO_SHOW';
@@ -23,6 +24,7 @@ export class BookingUnavailableError extends Error{constructor(public readonly r
 export class BookingConflictError extends Error{constructor(message='Booking slot was taken by another request'){super(message);this.name='BookingConflictError';}}
 export class BookingNotFoundError extends Error{constructor(){super('Booking not found');this.name='BookingNotFoundError';}}
 export class BookingStateError extends Error{constructor(message:string){super(message);this.name='BookingStateError';}}
+export class BookingPolicyError extends Error{constructor(public readonly reason:string){super(`Booking policy blocked action: ${reason}`);this.name='BookingPolicyError';}}
 export function assertPositiveMinutes(value:number,name:string){if(!Number.isInteger(value)||value<=0)throw new BookingValidationError(`${name} must be a positive integer`);return value;}
 const allowed={
   CONFIRMED:['PENDING'],
@@ -32,7 +34,7 @@ const allowed={
 } satisfies Record<Exclude<BookingStatus,'PENDING'>,BookingStatus[]>;
 export class BookingService{
   private readonly availability:AvailabilityEngine;
-  constructor(availabilityRepo:AvailabilityRepository,private readonly repo:BookingRepository){this.availability=new AvailabilityEngine(availabilityRepo);}
+  constructor(private readonly availabilityRepo:AvailabilityRepository,private readonly repo:BookingRepository,private readonly clock:()=>Date=()=>new Date()){this.availability=new AvailabilityEngine(availabilityRepo,clock);}
   async create(input:CreateBookingInput){
     if(!input.tenantId?.trim())throw new BookingValidationError('tenantId is required');
     if(!input.serviceId?.trim())throw new BookingValidationError('serviceId is required');
@@ -52,7 +54,7 @@ export class BookingService{
     return this.repo.transitionStatus({tenantId,bookingId,toStatus,allowedFrom:from,actorUserId:actorUserId??null,reason:reason?.trim()||null});
   }
   confirm(tenantId:string,bookingId:string,actorUserId?:string|null){return this.transition(tenantId,bookingId,'CONFIRMED',actorUserId);}
-  cancel(tenantId:string,bookingId:string,actorUserId?:string|null,reason?:string|null){return this.transition(tenantId,bookingId,'CANCELLED',actorUserId,reason);}
+  async cancel(tenantId:string,bookingId:string,actorUserId?:string|null,reason?:string|null){const current=await this.get(tenantId,bookingId);const policy=await this.availabilityRepo.getBookingPolicy(tenantId);if(!cancellationAllowed({startsAt:current.startsAt,now:this.clock(),policy}))throw new BookingPolicyError('cancellation_deadline');return this.transition(tenantId,bookingId,'CANCELLED',actorUserId,reason);}
   complete(tenantId:string,bookingId:string,actorUserId?:string|null){return this.transition(tenantId,bookingId,'COMPLETED',actorUserId);}
   noShow(tenantId:string,bookingId:string,actorUserId?:string|null){return this.transition(tenantId,bookingId,'NO_SHOW',actorUserId);}
   async reschedule(input:{tenantId:string;bookingId:string;startsAt:Date|string;staffId?:string;resourceId?:string;actorUserId?:string|null}){
