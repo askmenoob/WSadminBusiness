@@ -8,7 +8,8 @@
     "migrate": "tsx src/migrate.ts"
   },
   "dependencies": {
-    "pg": "^8.16.0"
+    "pg": "^8.16.0",
+    "@wsadmin-business/customers": "*"
   },
   "devDependencies": {
     "@types/node": "^26.4.0",

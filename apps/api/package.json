@@ -12,7 +12,8 @@
     "@wsadmin-business/database": "*",
     "fastify": "^5.6.0",
     "ioredis": "^5.7.0",
-    "@wsadmin-business/auth": "*"
+    "@wsadmin-business/auth": "*",
+    "@wsadmin-business/customers": "*"
   },
   "devDependencies": {
     "@types/node": "^26.4.0",
