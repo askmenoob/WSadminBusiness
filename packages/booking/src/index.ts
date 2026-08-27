@@ -4,9 +4,10 @@ export type BookingIntent='BOOK'|'RESCHEDULE'|'CANCEL'|'AVAILABILITY';
 export const BOOKING_CORE_RULE='deterministic-domain-service' as const;
 export type BookingStatus='PENDING'|'CONFIRMED'|'CANCELLED'|'COMPLETED'|'NO_SHOW';
 export type BookingSource='ADMIN'|'PHONE'|'WALK_IN'|'WHATSAPP'|'WEB'|'IMPORT';
+export type StaffAssignmentMode='AUTO'|'REQUESTED';
 export type Booking={
   id:string;tenantId:string;customerId:string|null;serviceId:string;staffId:string;resourceId:string|null;
-  status:BookingStatus;source:BookingSource;notes:string|null;startsAt:Date;endsAt:Date;effectiveStartsAt:Date;effectiveEndsAt:Date;createdAt:Date;updatedAt:Date;
+  status:BookingStatus;source:BookingSource;assignmentMode:StaffAssignmentMode;notes:string|null;startsAt:Date;endsAt:Date;effectiveStartsAt:Date;effectiveEndsAt:Date;createdAt:Date;updatedAt:Date;
 };
 export type BookingAuditEvent={id:string;tenantId:string;bookingId:string;actorUserId:string|null;eventType:string;fromStatus:BookingStatus|null;toStatus:BookingStatus|null;metadata:Record<string,unknown>;createdAt:Date};
 export type CreateBookingInput={tenantId:string;customerId?:string|null;serviceId:string;startsAt:Date|string;staffId?:string;resourceId?:string;status?:'PENDING'|'CONFIRMED';source?:BookingSource;notes?:string|null;actorUserId?:string|null};
@@ -14,7 +15,7 @@ export type PersistBookingInput=Omit<Booking,'id'|'createdAt'|'updatedAt'> & {ac
 export type BookingSearch={from?:Date;to?:Date;status?:BookingStatus;source?:BookingSource;customerId?:string;limit?:number;offset?:number};
 export type ManualBookingDate={startsAt:Date|string;staffId?:string;resourceId?:string};
 export type BookingTransitionInput={tenantId:string;bookingId:string;toStatus:BookingStatus;allowedFrom:BookingStatus[];actorUserId?:string|null;reason?:string|null};
-export type ReschedulePersistInput={tenantId:string;bookingId:string;staffId:string;resourceId:string|null;startsAt:Date;endsAt:Date;effectiveStartsAt:Date;effectiveEndsAt:Date;actorUserId?:string|null};
+export type ReschedulePersistInput={tenantId:string;bookingId:string;staffId:string;resourceId:string|null;assignmentMode:StaffAssignmentMode;startsAt:Date;endsAt:Date;effectiveStartsAt:Date;effectiveEndsAt:Date;actorUserId?:string|null};
 export interface BookingRepository{
   createWithConflictGuard(input:PersistBookingInput):Promise<Booking>;
   createManyWithConflictGuard(inputs:PersistBookingInput[]):Promise<Booking[]>;
@@ -52,7 +53,7 @@ export class BookingService{
     const checked=await this.availability.check({tenantId:input.tenantId,serviceId:input.serviceId,startsAt,staffId:input.staffId,resourceId:input.resourceId});
     if(!checked.available||!checked.candidates.length)throw new BookingUnavailableError(checked.reason??'no_candidate');
     const candidate=checked.candidates[0]!;
-    return this.repo.createWithConflictGuard({tenantId:input.tenantId,customerId:input.customerId??null,serviceId:input.serviceId,staffId:candidate.staffId,resourceId:candidate.resourceId,status:input.status??'CONFIRMED',source:assertBookingSource(input.source),notes:cleanNotes(input.notes),startsAt:candidate.startsAt,endsAt:candidate.endsAt,effectiveStartsAt:candidate.effectiveStartsAt,effectiveEndsAt:candidate.effectiveEndsAt,actorUserId:input.actorUserId??null});
+    return this.repo.createWithConflictGuard({tenantId:input.tenantId,customerId:input.customerId??null,serviceId:input.serviceId,staffId:candidate.staffId,resourceId:candidate.resourceId,status:input.status??'CONFIRMED',source:assertBookingSource(input.source),assignmentMode:input.staffId?'REQUESTED':'AUTO',notes:cleanNotes(input.notes),startsAt:candidate.startsAt,endsAt:candidate.endsAt,effectiveStartsAt:candidate.effectiveStartsAt,effectiveEndsAt:candidate.effectiveEndsAt,actorUserId:input.actorUserId??null});
   }
   async get(tenantId:string,bookingId:string){const row=await this.repo.get(tenantId,bookingId);if(!row)throw new BookingNotFoundError();return row;}
   search(tenantId:string,query:BookingSearch={}){return this.repo.search(tenantId,{...query,limit:Math.min(Math.max(query.limit??50,1),100),offset:Math.max(query.offset??0,0)});}
@@ -79,7 +80,7 @@ export class BookingService{
       const checked=await this.availability.check({tenantId:input.tenantId,serviceId:input.serviceId,startsAt,staffId:item.staffId,resourceId:item.resourceId});
       if(!checked.available||!checked.candidates.length)throw new BookingUnavailableError(`manual_item_${index}:${checked.reason??'no_candidate'}`);
       const c=checked.candidates[0]!;
-      prepared.push({tenantId:input.tenantId,customerId:input.customerId??null,serviceId:input.serviceId,staffId:c.staffId,resourceId:c.resourceId,status:input.status??'CONFIRMED',source,notes:cleanNotes(input.notes),startsAt:c.startsAt,endsAt:c.endsAt,effectiveStartsAt:c.effectiveStartsAt,effectiveEndsAt:c.effectiveEndsAt,actorUserId:input.actorUserId??null});
+      prepared.push({tenantId:input.tenantId,customerId:input.customerId??null,serviceId:input.serviceId,staffId:c.staffId,resourceId:c.resourceId,status:input.status??'CONFIRMED',source,assignmentMode:item.staffId?'REQUESTED':'AUTO',notes:cleanNotes(input.notes),startsAt:c.startsAt,endsAt:c.endsAt,effectiveStartsAt:c.effectiveStartsAt,effectiveEndsAt:c.effectiveEndsAt,actorUserId:input.actorUserId??null});
     }
     return this.repo.createManyWithConflictGuard(prepared);
   }
@@ -88,9 +89,10 @@ export class BookingService{
     if(!['PENDING','CONFIRMED'].includes(current.status))throw new BookingStateError(`cannot reschedule ${current.status} booking`);
     const startsAt=input.startsAt instanceof Date?input.startsAt:new Date(input.startsAt);
     if(Number.isNaN(startsAt.valueOf()))throw new BookingValidationError('startsAt must be a valid date-time');
-    const checked=await this.availability.check({tenantId:input.tenantId,serviceId:current.serviceId,startsAt,staffId:input.staffId??current.staffId,resourceId:input.resourceId??current.resourceId??undefined,excludeBookingId:current.id});
+    const selectedStaffId=input.staffId??(current.assignmentMode==='REQUESTED'?current.staffId:undefined);
+    const checked=await this.availability.check({tenantId:input.tenantId,serviceId:current.serviceId,startsAt,staffId:selectedStaffId,resourceId:input.resourceId??current.resourceId??undefined,excludeBookingId:current.id});
     if(!checked.available||!checked.candidates.length)throw new BookingUnavailableError(checked.reason??'no_candidate');
     const candidate=checked.candidates[0]!;
-    return this.repo.rescheduleWithConflictGuard({tenantId:input.tenantId,bookingId:current.id,staffId:candidate.staffId,resourceId:candidate.resourceId,startsAt:candidate.startsAt,endsAt:candidate.endsAt,effectiveStartsAt:candidate.effectiveStartsAt,effectiveEndsAt:candidate.effectiveEndsAt,actorUserId:input.actorUserId??null});
+    return this.repo.rescheduleWithConflictGuard({tenantId:input.tenantId,bookingId:current.id,staffId:candidate.staffId,resourceId:candidate.resourceId,assignmentMode:input.staffId?'REQUESTED':current.assignmentMode,startsAt:candidate.startsAt,endsAt:candidate.endsAt,effectiveStartsAt:candidate.effectiveStartsAt,effectiveEndsAt:candidate.effectiveEndsAt,actorUserId:input.actorUserId??null});
   }
 }

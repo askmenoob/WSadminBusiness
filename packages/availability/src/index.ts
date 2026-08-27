@@ -1,6 +1,6 @@
 import { evaluateBookingStart,type BookingPolicy } from '@wsadmin-business/booking-policy';
 export type AvailabilityService={id:string;active:boolean;durationMinutes:number;bufferBeforeMinutes:number;bufferAfterMinutes:number};
-export type AvailabilityStaff={id:string;active:boolean;bookingCapacity:number};
+export type AvailabilityStaff={id:string;active:boolean;bookingCapacity:number;sortOrder:number;displayName:string;photoUrl:string|null};
 export type AvailabilityResource={id:string;active:boolean;capacity:number};
 export type WeeklyHours={weekday:number;startMinute:number;endMinute:number};
 export type ShiftOverride={localDate:string;startMinute:number|null;endMinute:number|null;isOff:boolean};
@@ -9,7 +9,6 @@ export type AvailabilityControlBlock={startsAt:Date;endsAt:Date;type:'STOP_SALE'
 export type BusyCountQuery={tenantId:string;staffId?:string;resourceId?:string;startsAt:Date;endsAt:Date;excludeBookingId?:string};
 export interface AvailabilityRepository{
   getTenantTimezone(tenantId:string):Promise<string>;
-  getBookingPolicy(tenantId:string):Promise<BookingPolicy>;
   getBookingPolicy(tenantId:string):Promise<BookingPolicy>;
   getService(tenantId:string,serviceId:string):Promise<AvailabilityService|null>;
   listEligibleStaff(tenantId:string,serviceId:string,staffId?:string):Promise<AvailabilityStaff[]>;
@@ -21,7 +20,7 @@ export interface AvailabilityRepository{
   countBusyBookings(query:BusyCountQuery):Promise<number>;
 }
 export type AvailabilityRequest={tenantId:string;serviceId:string;startsAt:Date|string;staffId?:string;resourceId?:string;excludeBookingId?:string};
-export type AvailabilityCandidate={staffId:string;resourceId:string|null;startsAt:Date;endsAt:Date;effectiveStartsAt:Date;effectiveEndsAt:Date};
+export type AvailabilityCandidate={staffId:string;staffDisplayName:string;staffPhotoUrl:string|null;staffSortOrder:number;staffBusy:number;staffCapacity:number;resourceId:string|null;startsAt:Date;endsAt:Date;effectiveStartsAt:Date;effectiveEndsAt:Date};
 export type AvailabilityResult={available:boolean;reason?:string;candidates:AvailabilityCandidate[]};
 export class AvailabilityValidationError extends Error{constructor(message:string){super(message);this.name='AvailabilityValidationError';}}
 function overlap(aStart:Date,aEnd:Date,bStart:Date,bEnd:Date){return aStart<bEnd&&bStart<aEnd;}
@@ -81,7 +80,7 @@ export class AvailabilityEngine{
           const resourceBusy=await this.repo.countBusyBookings({tenantId:input.tenantId,resourceId:resource.id,startsAt:effectiveStartsAt,endsAt:effectiveEndsAt,excludeBookingId:input.excludeBookingId});
           if(resourceBusy>=resource.capacity)continue;
         }
-        candidates.push({staffId:person.id,resourceId:resource?.id??null,startsAt,endsAt,effectiveStartsAt,effectiveEndsAt});
+        candidates.push({staffId:person.id,staffDisplayName:person.displayName,staffPhotoUrl:person.photoUrl,staffSortOrder:person.sortOrder,staffBusy,staffCapacity:person.bookingCapacity,resourceId:resource?.id??null,startsAt,endsAt,effectiveStartsAt,effectiveEndsAt});
       }
     }
     return candidates.length?{available:true,candidates}:{available:false,reason:'no_capacity',candidates:[]};
