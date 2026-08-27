@@ -1,0 +1,5 @@
+import test from'node:test';import assert from'node:assert/strict';import{resolveOptionSelection,ServiceOptionValidationError,type ServiceOption,type ServiceOptionGroup}from'./options.js';
+const now=new Date();const groups:ServiceOptionGroup[]=[{id:'g1',tenantId:'t',serviceId:'s',name:'Add-ons',selectionMode:'MULTIPLE',required:false,active:true,sortOrder:0,createdAt:now,updatedAt:now}];
+const options:ServiceOption[]=[{id:'o1',tenantId:'t',groupId:'g1',name:'LED',durationDeltaMinutes:30,priceDeltaMinor:5000,requiredResourceType:'EQUIPMENT',active:true,sortOrder:0,createdAt:now,updatedAt:now}];
+test('service option selection changes duration price and resource requirement',()=>{assert.deepEqual(resolveOptionSelection(groups,options,['o1']),{optionIds:['o1'],durationDeltaMinutes:30,priceDeltaMinor:5000,requiredResourceType:'EQUIPMENT'});});
+test('service option selection rejects unknown option',()=>{assert.throws(()=>resolveOptionSelection(groups,options,['missing']),ServiceOptionValidationError);});

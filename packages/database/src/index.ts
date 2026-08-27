@@ -18,3 +18,4 @@ export { createCalendarRepository } from './calendar.js';
 export { createDashboardRepository } from './dashboard.js';
 export { createBookingPolicyRepository } from './booking-policy.js';
 export { createCalendarControlRepository } from './calendar-controls.js';
+export { createServiceOptionRepository } from './service-options.js';

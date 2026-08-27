@@ -1,9 +1,10 @@
 import Fastify from 'fastify';
 import { Redis } from 'ioredis';
 import { CAPABILITIES, ROLES, AccessDeniedError, authorize, type Actor, type Capability, type Role } from '@wsadmin-business/auth';
-import { createCustomerRepository, createPool, createServiceRepository, createStaffRepository, createStaffScheduleRepository, createResourceRepository, createAvailabilityRepository, createBookingPolicyRepository,createBookingRepository, createCalendarControlRepository,createCalendarRepository, createDashboardRepository, probeDatabase } from '@wsadmin-business/database';
+import { createCustomerRepository, createPool, createServiceOptionRepository,createServiceRepository, createStaffRepository, createStaffScheduleRepository, createResourceRepository, createAvailabilityRepository, createBookingPolicyRepository,createBookingRepository, createCalendarControlRepository,createCalendarRepository, createDashboardRepository, probeDatabase } from '@wsadmin-business/database';
 import { registerCustomerRoutes } from './customer-routes.js';
 import { registerServiceRoutes } from './service-routes.js';
+import { registerServiceOptionRoutes } from './service-option-routes.js';
 import { registerStaffRoutes } from './staff-routes.js';
 import { registerStaffScheduleRoutes } from './staff-schedule-routes.js';
 import { registerResourceRoutes } from './resource-routes.js';
@@ -22,6 +23,7 @@ export function buildApp(options:{enableDevRbacProbe?:boolean;customerRepository
   app.get('/api/v1',async()=>({name:'WSadmin Business API',version:'0.1.0',phase:'P1-booking-core',aiPolicy:'NO_DIRECT_DATABASE_WRITES'}));
   registerCustomerRoutes(app,options.customerRepository??createCustomerRepository(pool));
   registerServiceRoutes(app,options.serviceRepository??createServiceRepository(pool));
+  registerServiceOptionRoutes(app,createServiceOptionRepository(pool));
   registerStaffRoutes(app,options.staffRepository??createStaffRepository(pool));
   registerStaffScheduleRoutes(app,options.staffScheduleRepository??createStaffScheduleRepository(pool));
   registerResourceRoutes(app,options.resourceRepository??createResourceRepository(pool));

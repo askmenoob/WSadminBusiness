@@ -7,10 +7,10 @@ export type BookingSource='ADMIN'|'PHONE'|'WALK_IN'|'WHATSAPP'|'WEB'|'IMPORT';
 export type StaffAssignmentMode='AUTO'|'REQUESTED';
 export type Booking={
   id:string;tenantId:string;customerId:string|null;serviceId:string;staffId:string;resourceId:string|null;
-  status:BookingStatus;source:BookingSource;assignmentMode:StaffAssignmentMode;notes:string|null;startsAt:Date;endsAt:Date;effectiveStartsAt:Date;effectiveEndsAt:Date;createdAt:Date;updatedAt:Date;
+  status:BookingStatus;source:BookingSource;assignmentMode:StaffAssignmentMode;optionIds:string[];durationMinutes:number;basePriceMinor:number;optionPriceMinor:number;priceMinor:number;currency:string;notes:string|null;startsAt:Date;endsAt:Date;effectiveStartsAt:Date;effectiveEndsAt:Date;createdAt:Date;updatedAt:Date;
 };
 export type BookingAuditEvent={id:string;tenantId:string;bookingId:string;actorUserId:string|null;eventType:string;fromStatus:BookingStatus|null;toStatus:BookingStatus|null;metadata:Record<string,unknown>;createdAt:Date};
-export type CreateBookingInput={tenantId:string;customerId?:string|null;serviceId:string;startsAt:Date|string;staffId?:string;resourceId?:string;status?:'PENDING'|'CONFIRMED';source?:BookingSource;notes?:string|null;actorUserId?:string|null};
+export type CreateBookingInput={tenantId:string;customerId?:string|null;serviceId:string;startsAt:Date|string;staffId?:string;resourceId?:string;status?:'PENDING'|'CONFIRMED';source?:BookingSource;optionIds?:string[];notes?:string|null;actorUserId?:string|null};
 export type PersistBookingInput=Omit<Booking,'id'|'createdAt'|'updatedAt'> & {actorUserId?:string|null};
 export type BookingSearch={from?:Date;to?:Date;status?:BookingStatus;source?:BookingSource;customerId?:string;limit?:number;offset?:number};
 export type ManualBookingDate={startsAt:Date|string;staffId?:string;resourceId?:string};
@@ -50,10 +50,10 @@ export class BookingService{
     if(!input.serviceId?.trim())throw new BookingValidationError('serviceId is required');
     const startsAt=input.startsAt instanceof Date?input.startsAt:new Date(input.startsAt);
     if(Number.isNaN(startsAt.valueOf()))throw new BookingValidationError('startsAt must be a valid date-time');
-    const checked=await this.availability.check({tenantId:input.tenantId,serviceId:input.serviceId,startsAt,staffId:input.staffId,resourceId:input.resourceId});
+    const checked=await this.availability.check({tenantId:input.tenantId,serviceId:input.serviceId,startsAt,staffId:input.staffId,resourceId:input.resourceId,optionIds:input.optionIds});
     if(!checked.available||!checked.candidates.length)throw new BookingUnavailableError(checked.reason??'no_candidate');
     const candidate=checked.candidates[0]!;
-    return this.repo.createWithConflictGuard({tenantId:input.tenantId,customerId:input.customerId??null,serviceId:input.serviceId,staffId:candidate.staffId,resourceId:candidate.resourceId,status:input.status??'CONFIRMED',source:assertBookingSource(input.source),assignmentMode:input.staffId?'REQUESTED':'AUTO',notes:cleanNotes(input.notes),startsAt:candidate.startsAt,endsAt:candidate.endsAt,effectiveStartsAt:candidate.effectiveStartsAt,effectiveEndsAt:candidate.effectiveEndsAt,actorUserId:input.actorUserId??null});
+    return this.repo.createWithConflictGuard({tenantId:input.tenantId,customerId:input.customerId??null,serviceId:input.serviceId,staffId:candidate.staffId,resourceId:candidate.resourceId,status:input.status??'CONFIRMED',source:assertBookingSource(input.source),assignmentMode:input.staffId?'REQUESTED':'AUTO',optionIds:candidate.optionIds,durationMinutes:candidate.durationMinutes,basePriceMinor:candidate.basePriceMinor,optionPriceMinor:candidate.optionPriceMinor,priceMinor:candidate.priceMinor,currency:candidate.currency,notes:cleanNotes(input.notes),startsAt:candidate.startsAt,endsAt:candidate.endsAt,effectiveStartsAt:candidate.effectiveStartsAt,effectiveEndsAt:candidate.effectiveEndsAt,actorUserId:input.actorUserId??null});
   }
   async get(tenantId:string,bookingId:string){const row=await this.repo.get(tenantId,bookingId);if(!row)throw new BookingNotFoundError();return row;}
   search(tenantId:string,query:BookingSearch={}){return this.repo.search(tenantId,{...query,limit:Math.min(Math.max(query.limit??50,1),100),offset:Math.max(query.offset??0,0)});}
@@ -68,7 +68,7 @@ export class BookingService{
   async cancel(tenantId:string,bookingId:string,actorUserId?:string|null,reason?:string|null){const current=await this.get(tenantId,bookingId);const policy=await this.availabilityRepo.getBookingPolicy(tenantId);if(!cancellationAllowed({startsAt:current.startsAt,now:this.clock(),policy}))throw new BookingPolicyError('cancellation_deadline');return this.transition(tenantId,bookingId,'CANCELLED',actorUserId,reason);}
   complete(tenantId:string,bookingId:string,actorUserId?:string|null){return this.transition(tenantId,bookingId,'COMPLETED',actorUserId);}
   noShow(tenantId:string,bookingId:string,actorUserId?:string|null){return this.transition(tenantId,bookingId,'NO_SHOW',actorUserId);}
-  async createManualBatch(input:{tenantId:string;customerId?:string|null;serviceId:string;dates:ManualBookingDate[];source:'ADMIN'|'PHONE'|'WALK_IN';status?:'PENDING'|'CONFIRMED';notes?:string|null;actorUserId?:string|null}){
+  async createManualBatch(input:{tenantId:string;customerId?:string|null;serviceId:string;dates:ManualBookingDate[];source:'ADMIN'|'PHONE'|'WALK_IN';status?:'PENDING'|'CONFIRMED';optionIds?:string[];notes?:string|null;actorUserId?:string|null}){
     if(!Array.isArray(input.dates)||input.dates.length<1||input.dates.length>50)throw new BookingValidationError('manual booking dates must contain 1 to 50 items');
     const source=assertBookingSource(input.source);
     if(!['ADMIN','PHONE','WALK_IN'].includes(source))throw new BookingValidationError('manual booking source must be ADMIN, PHONE or WALK_IN');
@@ -77,10 +77,10 @@ export class BookingService{
       const item=input.dates[index]!;
       const startsAt=item.startsAt instanceof Date?item.startsAt:new Date(item.startsAt);
       if(Number.isNaN(startsAt.valueOf()))throw new BookingValidationError(`dates[${index}].startsAt must be valid`);
-      const checked=await this.availability.check({tenantId:input.tenantId,serviceId:input.serviceId,startsAt,staffId:item.staffId,resourceId:item.resourceId});
+      const checked=await this.availability.check({tenantId:input.tenantId,serviceId:input.serviceId,startsAt,staffId:item.staffId,resourceId:item.resourceId,optionIds:input.optionIds});
       if(!checked.available||!checked.candidates.length)throw new BookingUnavailableError(`manual_item_${index}:${checked.reason??'no_candidate'}`);
       const c=checked.candidates[0]!;
-      prepared.push({tenantId:input.tenantId,customerId:input.customerId??null,serviceId:input.serviceId,staffId:c.staffId,resourceId:c.resourceId,status:input.status??'CONFIRMED',source,assignmentMode:item.staffId?'REQUESTED':'AUTO',notes:cleanNotes(input.notes),startsAt:c.startsAt,endsAt:c.endsAt,effectiveStartsAt:c.effectiveStartsAt,effectiveEndsAt:c.effectiveEndsAt,actorUserId:input.actorUserId??null});
+      prepared.push({tenantId:input.tenantId,customerId:input.customerId??null,serviceId:input.serviceId,staffId:c.staffId,resourceId:c.resourceId,status:input.status??'CONFIRMED',source,assignmentMode:item.staffId?'REQUESTED':'AUTO',optionIds:c.optionIds,durationMinutes:c.durationMinutes,basePriceMinor:c.basePriceMinor,optionPriceMinor:c.optionPriceMinor,priceMinor:c.priceMinor,currency:c.currency,notes:cleanNotes(input.notes),startsAt:c.startsAt,endsAt:c.endsAt,effectiveStartsAt:c.effectiveStartsAt,effectiveEndsAt:c.effectiveEndsAt,actorUserId:input.actorUserId??null});
     }
     return this.repo.createManyWithConflictGuard(prepared);
   }
@@ -90,7 +90,7 @@ export class BookingService{
     const startsAt=input.startsAt instanceof Date?input.startsAt:new Date(input.startsAt);
     if(Number.isNaN(startsAt.valueOf()))throw new BookingValidationError('startsAt must be a valid date-time');
     const selectedStaffId=input.staffId??(current.assignmentMode==='REQUESTED'?current.staffId:undefined);
-    const checked=await this.availability.check({tenantId:input.tenantId,serviceId:current.serviceId,startsAt,staffId:selectedStaffId,resourceId:input.resourceId??current.resourceId??undefined,excludeBookingId:current.id});
+    const checked=await this.availability.check({tenantId:input.tenantId,serviceId:current.serviceId,startsAt,staffId:selectedStaffId,resourceId:input.resourceId??current.resourceId??undefined,optionIds:current.optionIds,excludeBookingId:current.id});
     if(!checked.available||!checked.candidates.length)throw new BookingUnavailableError(checked.reason??'no_candidate');
     const candidate=checked.candidates[0]!;
     return this.repo.rescheduleWithConflictGuard({tenantId:input.tenantId,bookingId:current.id,staffId:candidate.staffId,resourceId:candidate.resourceId,assignmentMode:input.staffId?'REQUESTED':current.assignmentMode,startsAt:candidate.startsAt,endsAt:candidate.endsAt,effectiveStartsAt:candidate.effectiveStartsAt,effectiveEndsAt:candidate.effectiveEndsAt,actorUserId:input.actorUserId??null});

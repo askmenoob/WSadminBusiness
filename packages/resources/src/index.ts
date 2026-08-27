@@ -7,6 +7,7 @@ export type Resource={
 export type CreateResourceInput={name:string;type:ResourceType;capacity?:number;active?:boolean;sortOrder?:number;description?:string|null};
 export type UpdateResourceInput=Partial<CreateResourceInput>;
 export type ResourceSearch={q?:string;type?:ResourceType;active?:boolean;serviceId?:string;limit?:number;offset?:number};
+export type ResourceServiceAssignment={serviceId:string;allocationPriority:number};
 export interface ResourceRepository{
   create(tenantId:string,input:CreateResourceInput):Promise<Resource>;
   get(tenantId:string,id:string):Promise<Resource|null>;
@@ -15,6 +16,8 @@ export interface ResourceRepository{
   setServices(tenantId:string,resourceId:string,serviceIds:string[]):Promise<string[]>;
   getServices(tenantId:string,resourceId:string):Promise<string[]>;
   isCompatible(tenantId:string,resourceId:string,serviceId:string):Promise<boolean>;
+  setServicePriority(tenantId:string,resourceId:string,serviceId:string,allocationPriority:number):Promise<ResourceServiceAssignment>;
+  getServiceAssignments(tenantId:string,resourceId:string):Promise<ResourceServiceAssignment[]>;
 }
 export class ResourceValidationError extends Error{constructor(message:string){super(message);this.name='ResourceValidationError';}}
 export class ResourceNotFoundError extends Error{constructor(){super('Resource not found');this.name='ResourceNotFoundError';}}
@@ -33,4 +36,6 @@ export class ResourceDirectory{
   async setServices(tenantId:string,id:string,serviceIds:string[]){await this.get(tenantId,id);return this.repo.setServices(tenantId,id,[...new Set(serviceIds)]);}
   async getServices(tenantId:string,id:string){await this.get(tenantId,id);return this.repo.getServices(tenantId,id);}
   async assertCompatible(tenantId:string,id:string,serviceId:string){if(!(await this.repo.isCompatible(tenantId,id,serviceId)))throw new ResourceConflictError('resource is not compatible with this service');return true;}
+  async setServicePriority(tenantId:string,id:string,serviceId:string,allocationPriority:number){await this.get(tenantId,id);if(!Number.isInteger(allocationPriority)||allocationPriority<0||allocationPriority>100000)throw new ResourceValidationError('allocationPriority must be 0 to 100000');return this.repo.setServicePriority(tenantId,id,serviceId,allocationPriority);}
+  async getServiceAssignments(tenantId:string,id:string){await this.get(tenantId,id);return this.repo.getServiceAssignments(tenantId,id);}
 }

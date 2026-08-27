@@ -50,3 +50,4 @@ export class ServiceCatalog {
     const row=await this.repo.updateService(tenantId,id,next);if(!row)throw new ServiceNotFoundError();return row;
   }
 }
+export * from './options.js';
