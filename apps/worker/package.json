@@ -1,6 +1,20 @@
 {
-  "name":"@wsadmin-business/worker","private":true,"type":"module",
-  "scripts":{"dev":"tsx src/index.ts","typecheck":"tsc --noEmit"},
-  "dependencies":{"ioredis":"^5.7.0"},
-  "devDependencies":{"@types/node":"^26.4.0","tsx":"^4.20.0","typescript":"^5.9.0"}
+  "name": "@wsadmin-business/worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "ioredis": "^5.7.0",
+    "@wsadmin-business/whatsapp-delivery": "*",
+    "@wsadmin-business/database": "*",
+    "@wsadmin-business/whatsapp": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  }
 }

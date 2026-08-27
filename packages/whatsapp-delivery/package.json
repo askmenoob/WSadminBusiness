@@ -1,0 +1,17 @@
+{
+  "name": "@wsadmin-business/whatsapp-delivery",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test src/*.test.ts"
+  },
+  "dependencies": {
+    "@wsadmin-business/whatsapp": "*"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  },
+  "exports": "./src/index.ts"
+}
