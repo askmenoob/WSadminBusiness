@@ -9,3 +9,4 @@ export async function probeDatabase(pool: Pool) {
 }
 export { createCustomerRepository } from './customers.js';
 export { createServiceRepository } from './services.js';
+export { createStaffRepository } from './staff.js';

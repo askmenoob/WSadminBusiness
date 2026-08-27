@@ -1,0 +1,22 @@
+import type { Pool, PoolClient } from 'pg';
+import { StaffConflictError, type Skill, type StaffProfile, type StaffRepository, type CreateStaffInput, type UpdateStaffInput } from '@wsadmin-business/staff';
+const mapStaff=(r:any):StaffProfile=>({id:r.id,tenantId:r.tenant_id,userId:r.user_id,displayName:r.display_name,phone:r.phone,email:r.email,photoUrl:r.photo_url,active:r.active,bookingCapacity:r.booking_capacity,sortOrder:r.sort_order,createdAt:r.created_at,updatedAt:r.updated_at});
+const mapSkill=(r:any):Skill=>({id:r.id,tenantId:r.tenant_id,name:r.name,createdAt:r.created_at});
+function translate(e:unknown):never{if(typeof e==='object'&&e&&'code'in e){const c=(e as any).code;if(c==='23505')throw new StaffConflictError('duplicate staff/skill assignment');if(c==='23503')throw new StaffConflictError('staff, skill or service does not belong to tenant');}throw e;}
+async function replaceLinks(client:PoolClient,table:string,column:string,tenantId:string,staffId:string,ids:string[]){
+  await client.query(`DELETE FROM ${table} WHERE tenant_id=$1 AND staff_id=$2`,[tenantId,staffId]);
+  for(const id of ids)await client.query(`INSERT INTO ${table}(tenant_id,staff_id,${column}) VALUES($1,$2,$3)`,[tenantId,staffId,id]);
+  return ids;
+}
+export function createStaffRepository(pool:Pool):StaffRepository{return{
+  async createStaff(t,i:CreateStaffInput){try{const r=await pool.query(`INSERT INTO staff_profiles(tenant_id,user_id,display_name,phone,email,photo_url,active,booking_capacity,sort_order) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,[t,i.userId??null,i.displayName,i.phone??null,i.email??null,i.photoUrl??null,i.active??true,i.bookingCapacity??1,i.sortOrder??0]);return mapStaff(r.rows[0]);}catch(e){return translate(e);}},
+  async getStaff(t,id){const r=await pool.query('SELECT * FROM staff_profiles WHERE tenant_id=$1 AND id=$2',[t,id]);return r.rowCount?mapStaff(r.rows[0]):null;},
+  async listStaff(t,inc=false){const r=await pool.query('SELECT * FROM staff_profiles WHERE tenant_id=$1 AND ($2::boolean OR active=true) ORDER BY sort_order,display_name',[t,inc]);return r.rows.map(mapStaff);},
+  async updateStaff(t,id,i:UpdateStaffInput){const cur=await pool.query('SELECT * FROM staff_profiles WHERE tenant_id=$1 AND id=$2',[t,id]);if(!cur.rowCount)return null;const x=cur.rows[0];try{const r=await pool.query(`UPDATE staff_profiles SET user_id=$3,display_name=$4,phone=$5,email=$6,photo_url=$7,active=$8,booking_capacity=$9,sort_order=$10,updated_at=now() WHERE tenant_id=$1 AND id=$2 RETURNING *`,[t,id,'userId'in i?i.userId:x.user_id,'displayName'in i?i.displayName:x.display_name,'phone'in i?i.phone:x.phone,'email'in i?i.email:x.email,'photoUrl'in i?i.photoUrl:x.photo_url,'active'in i?i.active:x.active,'bookingCapacity'in i?i.bookingCapacity:x.booking_capacity,'sortOrder'in i?i.sortOrder:x.sort_order]);return mapStaff(r.rows[0]);}catch(e){return translate(e);}},
+  async createSkill(t,name){try{const r=await pool.query('INSERT INTO skills(tenant_id,name) VALUES($1,$2) RETURNING *',[t,name]);return mapSkill(r.rows[0]);}catch(e){return translate(e);}},
+  async listSkills(t){const r=await pool.query('SELECT * FROM skills WHERE tenant_id=$1 ORDER BY name',[t]);return r.rows.map(mapSkill);},
+  async setStaffSkills(t,s,ids){const client=await pool.connect();try{await client.query('BEGIN');const out=await replaceLinks(client,'staff_skills','skill_id',t,s,ids);await client.query('COMMIT');return out;}catch(e){await client.query('ROLLBACK');return translate(e);}finally{client.release();}},
+  async setStaffServices(t,s,ids){const client=await pool.connect();try{await client.query('BEGIN');const out=await replaceLinks(client,'staff_services','service_id',t,s,ids);await client.query('COMMIT');return out;}catch(e){await client.query('ROLLBACK');return translate(e);}finally{client.release();}},
+  async getStaffServices(t,s){const r=await pool.query('SELECT service_id FROM staff_services WHERE tenant_id=$1 AND staff_id=$2 ORDER BY service_id',[t,s]);return r.rows.map(x=>x.service_id as string);},
+  async isEligibleForService(t,s,id){const r=await pool.query('SELECT 1 FROM staff_services ss JOIN staff_profiles sp ON sp.tenant_id=ss.tenant_id AND sp.id=ss.staff_id JOIN services sv ON sv.tenant_id=ss.tenant_id AND sv.id=ss.service_id WHERE ss.tenant_id=$1 AND ss.staff_id=$2 AND ss.service_id=$3 AND sp.active=true AND sv.active=true',[t,s,id]);return Boolean(r.rowCount);}
+};}
