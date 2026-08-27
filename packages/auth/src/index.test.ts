@@ -10,3 +10,5 @@ test('viewer cannot mutate bookings',()=>assert.throws(()=>authorize({userId:'v'
 test('staff cannot manage service catalog',()=>{assert.throws(()=>authorize({userId:'u',role:'STAFF',tenantId:'ta'},'ta','SERVICE_WRITE'),AccessDeniedError);});
 
 test('staff cannot manage staff directory',()=>{assert.throws(()=>authorize({userId:'u',role:'STAFF',tenantId:'ta'},'ta','STAFF_WRITE'),AccessDeniedError);});
+
+test('staff cannot manage resources',()=>{assert.throws(()=>authorize({userId:'u',role:'STAFF',tenantId:'ta'},'ta','RESOURCE_WRITE'),AccessDeniedError);});

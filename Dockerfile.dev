@@ -13,5 +13,6 @@ COPY packages/auth/package.json packages/auth/package.json
 COPY packages/customers/package.json packages/customers/package.json
 COPY packages/services/package.json packages/services/package.json
 COPY packages/staff/package.json packages/staff/package.json
+COPY packages/resources/package.json packages/resources/package.json
 RUN npm ci
 COPY . .

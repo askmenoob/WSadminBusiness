@@ -15,7 +15,8 @@
     "@wsadmin-business/auth": "*",
     "@wsadmin-business/customers": "*",
     "@wsadmin-business/services": "*",
-    "@wsadmin-business/staff": "*"
+    "@wsadmin-business/staff": "*",
+    "@wsadmin-business/resources": "*"
   },
   "devDependencies": {
     "@types/node": "^26.4.0",
