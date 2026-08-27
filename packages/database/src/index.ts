@@ -26,3 +26,4 @@ export { createInboxRepository } from './inbox.js';
 export { createWhatsAppBookingFlowRepository } from './whatsapp-booking-flow.js';
 export { createWhatsAppBookingManagementRepository } from './whatsapp-booking-management.js';
 export { createDeliveryRepository } from './whatsapp-delivery.js';
+export { createAiSettingsRepository,createAiUsageRepository } from './ai.js';

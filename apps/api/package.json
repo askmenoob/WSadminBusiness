@@ -25,7 +25,8 @@
     "@wsadmin-business/locations": "*",
     "@wsadmin-business/whatsapp": "*",
     "@wsadmin-business/inbox": "*",
-    "@wsadmin-business/whatsapp-booking": "*"
+    "@wsadmin-business/whatsapp-booking": "*",
+    "@wsadmin-business/ai": "*"
   },
   "devDependencies": {
     "@types/node": "^26.4.0",
