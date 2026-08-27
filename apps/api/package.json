@@ -18,7 +18,8 @@
     "@wsadmin-business/staff": "*",
     "@wsadmin-business/resources": "*",
     "@wsadmin-business/availability": "*",
-    "@wsadmin-business/booking": "*"
+    "@wsadmin-business/booking": "*",
+    "@wsadmin-business/calendar": "*"
   },
   "devDependencies": {
     "@types/node": "^26.4.0",

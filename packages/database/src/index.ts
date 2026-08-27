@@ -14,3 +14,4 @@ export { createStaffScheduleRepository } from './staff-schedule.js';
 export { createResourceRepository } from './resources.js';
 export { createAvailabilityRepository } from './availability.js';
 export { createBookingRepository } from './bookings.js';
+export { createCalendarRepository } from './calendar.js';
