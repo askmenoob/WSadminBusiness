@@ -8,3 +8,4 @@ export async function probeDatabase(pool: Pool) {
   return { status:'ok' as const, database: result.rows[0]?.database ?? 'unknown' };
 }
 export { createCustomerRepository } from './customers.js';
+export { createServiceRepository } from './services.js';

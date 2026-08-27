@@ -11,5 +11,6 @@ COPY packages/whatsapp/package.json packages/whatsapp/package.json
 COPY packages/database/package.json packages/database/package.json
 COPY packages/auth/package.json packages/auth/package.json
 COPY packages/customers/package.json packages/customers/package.json
+COPY packages/services/package.json packages/services/package.json
 RUN npm ci
 COPY . .

@@ -9,7 +9,8 @@
   },
   "dependencies": {
     "pg": "^8.16.0",
-    "@wsadmin-business/customers": "*"
+    "@wsadmin-business/customers": "*",
+    "@wsadmin-business/services": "*"
   },
   "devDependencies": {
     "@types/node": "^26.4.0",
