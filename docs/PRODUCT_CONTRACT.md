@@ -14,7 +14,7 @@ Repitte-class booking, staff/resource scheduling, CRM, messaging automation, pay
 4. WhatsApp is accessed through a provider adapter. Evolution is first implementation, not a permanent coupling.
 5. Dashboard, WhatsApp, web booking and AI use the same Booking Service and availability rules.
 6. Human takeover is always available for uncertain or sensitive conversations.
-7. Every completed TODO checkpoint is committed and pushed to the private GitHub repository.
+7. Every completed TODO checkpoint is committed and pushed to the user-designated GitHub repository `askmenoob/WSadminBusiness`; no secrets or local `.env` files may be committed.
 
 ## Product name
 

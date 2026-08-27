@@ -1,6 +1,8 @@
 # GitHub Backup Policy
 
-Repository: `askmenoob/wsadmin-business` (private).
+Primary repository: `askmenoob/WSadminBusiness` (user-designated GitHub repository).
+
+Current GitHub visibility is **public**. Secret checks and `.env` exclusion are mandatory before every push. The previous `askmenoob/wsadmin-business` remote may remain configured locally only as a legacy backup; it is not the primary origin.
 
 - `dev`: active development branch; every meaningful completed TODO checkpoint must be committed and pushed.
 - `main`: release/baseline branch; promotion only after gates pass.
