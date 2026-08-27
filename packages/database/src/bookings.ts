@@ -1,6 +1,6 @@
 import type { Pool,PoolClient } from 'pg';
 import { BookingConflictError,BookingNotFoundError,BookingStateError,type Booking,type BookingAuditEvent,type BookingRepository,type BookingTransitionInput,type PersistBookingInput,type ReschedulePersistInput } from '@wsadmin-business/booking';
-const map=(r:any):Booking=>({id:r.id,tenantId:r.tenant_id,customerId:r.customer_id,serviceId:r.service_id,staffId:r.staff_id,resourceId:r.resource_id,status:r.status,startsAt:r.starts_at,endsAt:r.ends_at,effectiveStartsAt:r.effective_starts_at,effectiveEndsAt:r.effective_ends_at,createdAt:r.created_at,updatedAt:r.updated_at});
+const map=(r:any):Booking=>({id:r.id,tenantId:r.tenant_id,customerId:r.customer_id,serviceId:r.service_id,staffId:r.staff_id,resourceId:r.resource_id,status:r.status,source:r.source,notes:r.notes,startsAt:r.starts_at,endsAt:r.ends_at,effectiveStartsAt:r.effective_starts_at,effectiveEndsAt:r.effective_ends_at,createdAt:r.created_at,updatedAt:r.updated_at});
 const mapAudit=(r:any):BookingAuditEvent=>({id:r.id,tenantId:r.tenant_id,bookingId:r.booking_id,actorUserId:r.actor_user_id,eventType:r.event_type,fromStatus:r.from_status,toStatus:r.to_status,metadata:r.metadata??{},createdAt:r.created_at});
 async function writeAudit(c:PoolClient,args:{tenantId:string;bookingId:string;actorUserId?:string|null;eventType:string;fromStatus?:string|null;toStatus?:string|null;metadata?:Record<string,unknown>}){
   await c.query('INSERT INTO booking_audit_events(tenant_id,booking_id,actor_user_id,event_type,from_status,to_status,metadata) VALUES($1,$2,$3,$4,$5,$6,$7::jsonb)',[args.tenantId,args.bookingId,args.actorUserId??null,args.eventType,args.fromStatus??null,args.toStatus??null,JSON.stringify(args.metadata??{})]);
@@ -33,13 +33,28 @@ export function createBookingRepository(pool:Pool):BookingRepository{return{
     try{
       await c.query('BEGIN');
       await lockAndCheckCapacity(c,{tenantId:i.tenantId,serviceId:i.serviceId,staffId:i.staffId,resourceId:i.resourceId,startsAt:i.effectiveStartsAt,endsAt:i.effectiveEndsAt});
-      const inserted=await c.query(`INSERT INTO bookings(tenant_id,customer_id,service_id,staff_id,resource_id,status,starts_at,ends_at,effective_starts_at,effective_ends_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,[i.tenantId,i.customerId,i.serviceId,i.staffId,i.resourceId,i.status,i.startsAt,i.endsAt,i.effectiveStartsAt,i.effectiveEndsAt]);
+      const inserted=await c.query(`INSERT INTO bookings(tenant_id,customer_id,service_id,staff_id,resource_id,status,source,notes,starts_at,ends_at,effective_starts_at,effective_ends_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,[i.tenantId,i.customerId,i.serviceId,i.staffId,i.resourceId,i.status,i.source,i.notes,i.startsAt,i.endsAt,i.effectiveStartsAt,i.effectiveEndsAt]);
       const row=map(inserted.rows[0]);
-      await writeAudit(c,{tenantId:i.tenantId,bookingId:row.id,actorUserId:i.actorUserId,eventType:'CREATED',toStatus:row.status,metadata:{startsAt:row.startsAt.toISOString(),staffId:row.staffId,resourceId:row.resourceId}});
+      await writeAudit(c,{tenantId:i.tenantId,bookingId:row.id,actorUserId:i.actorUserId,eventType:'CREATED',toStatus:row.status,metadata:{startsAt:row.startsAt.toISOString(),staffId:row.staffId,resourceId:row.resourceId,source:row.source}});
       await c.query('COMMIT');return row;
     }catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}
   },
+  async createManyWithConflictGuard(inputs){
+    if(!inputs.length)return[];
+    const tenantId=inputs[0]!.tenantId;if(inputs.some(x=>x.tenantId!==tenantId))throw new BookingConflictError('manual batch cannot mix tenants');
+    const c=await pool.connect();const rows:Booking[]=[];
+    try{await c.query('BEGIN');
+      for(const i of inputs){
+        await lockAndCheckCapacity(c,{tenantId:i.tenantId,serviceId:i.serviceId,staffId:i.staffId,resourceId:i.resourceId,startsAt:i.effectiveStartsAt,endsAt:i.effectiveEndsAt});
+        const inserted=await c.query(`INSERT INTO bookings(tenant_id,customer_id,service_id,staff_id,resource_id,status,source,notes,starts_at,ends_at,effective_starts_at,effective_ends_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,[i.tenantId,i.customerId,i.serviceId,i.staffId,i.resourceId,i.status,i.source,i.notes,i.startsAt,i.endsAt,i.effectiveStartsAt,i.effectiveEndsAt]);
+        const row=map(inserted.rows[0]);rows.push(row);
+        await writeAudit(c,{tenantId:i.tenantId,bookingId:row.id,actorUserId:i.actorUserId,eventType:'CREATED',toStatus:row.status,metadata:{startsAt:row.startsAt.toISOString(),staffId:row.staffId,resourceId:row.resourceId,source:row.source,batch:true}});
+      }
+      await c.query('COMMIT');return rows;
+    }catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}
+  },
   async get(t,id){const r=await pool.query('SELECT * FROM bookings WHERE tenant_id=$1 AND id=$2',[t,id]);return r.rowCount?map(r.rows[0]):null;},
+  async search(t,q){const r=await pool.query(`SELECT * FROM bookings WHERE tenant_id=$1 AND ($2::timestamptz IS NULL OR starts_at >= $2) AND ($3::timestamptz IS NULL OR starts_at < $3) AND ($4::wsb_booking_status IS NULL OR status=$4) AND ($5::wsb_booking_source IS NULL OR source=$5) AND ($6::uuid IS NULL OR customer_id=$6) ORDER BY starts_at DESC,id LIMIT $7 OFFSET $8`,[t,q.from??null,q.to??null,q.status??null,q.source??null,q.customerId??null,q.limit??50,q.offset??0]);return r.rows.map(map);},
   async transitionStatus(i:BookingTransitionInput){
     const c=await pool.connect();try{await c.query('BEGIN');const currentQ=await c.query('SELECT * FROM bookings WHERE tenant_id=$1 AND id=$2 FOR UPDATE',[i.tenantId,i.bookingId]);if(!currentQ.rowCount)throw new BookingNotFoundError();const current=map(currentQ.rows[0]);if(!i.allowedFrom.includes(current.status))throw new BookingStateError(`cannot transition ${current.status} to ${i.toStatus}`);const updated=await c.query('UPDATE bookings SET status=$3,updated_at=now() WHERE tenant_id=$1 AND id=$2 RETURNING *',[i.tenantId,i.bookingId,i.toStatus]);const row=map(updated.rows[0]);await writeAudit(c,{tenantId:i.tenantId,bookingId:i.bookingId,actorUserId:i.actorUserId,eventType:`STATUS_${i.toStatus}`,fromStatus:current.status,toStatus:i.toStatus,metadata:{reason:i.reason??null}});await c.query('COMMIT');return row;}catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}
   },
