@@ -11,8 +11,8 @@ export function createAvailabilityRepository(pool:Pool):AvailabilityRepository{r
   async countBusyBookings(q:BusyCountQuery){
     if(!q.staffId&&!q.resourceId)throw new Error('staffId or resourceId required');
     const r=q.staffId
-      ?await pool.query(`SELECT count(*)::int AS count FROM bookings WHERE tenant_id=$1 AND staff_id=$2 AND status IN ('PENDING','CONFIRMED') AND effective_starts_at<$4 AND $3<effective_ends_at`,[q.tenantId,q.staffId,q.startsAt,q.endsAt])
-      :await pool.query(`SELECT count(*)::int AS count FROM bookings WHERE tenant_id=$1 AND resource_id=$2 AND status IN ('PENDING','CONFIRMED') AND effective_starts_at<$4 AND $3<effective_ends_at`,[q.tenantId,q.resourceId,q.startsAt,q.endsAt]);
+      ?await pool.query(`SELECT count(*)::int AS count FROM bookings WHERE tenant_id=$1 AND staff_id=$2 AND status IN ('PENDING','CONFIRMED') AND effective_starts_at<$4 AND $3<effective_ends_at AND ($5::uuid IS NULL OR id<>$5::uuid)`,[q.tenantId,q.staffId,q.startsAt,q.endsAt,q.excludeBookingId??null])
+      :await pool.query(`SELECT count(*)::int AS count FROM bookings WHERE tenant_id=$1 AND resource_id=$2 AND status IN ('PENDING','CONFIRMED') AND effective_starts_at<$4 AND $3<effective_ends_at AND ($5::uuid IS NULL OR id<>$5::uuid)`,[q.tenantId,q.resourceId,q.startsAt,q.endsAt,q.excludeBookingId??null]);
     return Number(r.rows[0]?.count??0);
   }
 };}

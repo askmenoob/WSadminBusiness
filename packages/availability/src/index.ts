@@ -4,7 +4,7 @@ export type AvailabilityResource={id:string;active:boolean;capacity:number};
 export type WeeklyHours={weekday:number;startMinute:number;endMinute:number};
 export type ShiftOverride={localDate:string;startMinute:number|null;endMinute:number|null;isOff:boolean};
 export type TimeBlock={startsAt:Date;endsAt:Date};
-export type BusyCountQuery={tenantId:string;staffId?:string;resourceId?:string;startsAt:Date;endsAt:Date};
+export type BusyCountQuery={tenantId:string;staffId?:string;resourceId?:string;startsAt:Date;endsAt:Date;excludeBookingId?:string};
 export interface AvailabilityRepository{
   getTenantTimezone(tenantId:string):Promise<string>;
   getService(tenantId:string,serviceId:string):Promise<AvailabilityService|null>;
@@ -15,7 +15,7 @@ export interface AvailabilityRepository{
   listCompatibleResources(tenantId:string,serviceId:string,resourceId?:string):Promise<AvailabilityResource[]>;
   countBusyBookings(query:BusyCountQuery):Promise<number>;
 }
-export type AvailabilityRequest={tenantId:string;serviceId:string;startsAt:Date|string;staffId?:string;resourceId?:string};
+export type AvailabilityRequest={tenantId:string;serviceId:string;startsAt:Date|string;staffId?:string;resourceId?:string;excludeBookingId?:string};
 export type AvailabilityCandidate={staffId:string;resourceId:string|null;startsAt:Date;endsAt:Date;effectiveStartsAt:Date;effectiveEndsAt:Date};
 export type AvailabilityResult={available:boolean;reason?:string;candidates:AvailabilityCandidate[]};
 export class AvailabilityValidationError extends Error{constructor(message:string){super(message);this.name='AvailabilityValidationError';}}
@@ -63,12 +63,12 @@ export class AvailabilityEngine{
       if(!within)continue;
       const blocks=await this.repo.getTimeBlocks(input.tenantId,person.id,effectiveStartsAt,effectiveEndsAt);
       if(blocks.some(b=>overlap(effectiveStartsAt,effectiveEndsAt,b.startsAt,b.endsAt)))continue;
-      const staffBusy=await this.repo.countBusyBookings({tenantId:input.tenantId,staffId:person.id,startsAt:effectiveStartsAt,endsAt:effectiveEndsAt});
+      const staffBusy=await this.repo.countBusyBookings({tenantId:input.tenantId,staffId:person.id,startsAt:effectiveStartsAt,endsAt:effectiveEndsAt,excludeBookingId:input.excludeBookingId});
       if(staffBusy>=person.bookingCapacity)continue;
       for(const resource of resources){
         if(resource){
           if(!resource.active)continue;
-          const resourceBusy=await this.repo.countBusyBookings({tenantId:input.tenantId,resourceId:resource.id,startsAt:effectiveStartsAt,endsAt:effectiveEndsAt});
+          const resourceBusy=await this.repo.countBusyBookings({tenantId:input.tenantId,resourceId:resource.id,startsAt:effectiveStartsAt,endsAt:effectiveEndsAt,excludeBookingId:input.excludeBookingId});
           if(resourceBusy>=resource.capacity)continue;
         }
         candidates.push({staffId:person.id,resourceId:resource?.id??null,startsAt,endsAt,effectiveStartsAt,effectiveEndsAt});
