@@ -42,3 +42,4 @@ export class WhatsAppBookingFlowService{
 function formatTime(date:Date,timeZone:string){return new Intl.DateTimeFormat('ms-MY',{timeZone,hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(date);}
 function formatDateTime(date:Date,timeZone:string){return new Intl.DateTimeFormat('ms-MY',{timeZone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(date);}
 function createKey(text:string){let h=2166136261;for(const ch of text){h^=ch.charCodeAt(0);h=Math.imul(h,16777619);}return(h>>>0).toString(16);}
+export * from './management.js';

@@ -105,7 +105,7 @@ function zonedLocalToUtc(localDate:string,minute:number,timeZone:string){
   for(let i=0;i<4;i++){const parts=new Intl.DateTimeFormat('en-CA',{timeZone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date(guess));const get=(t:string)=>Number(parts.find(p=>p.type===t)?.value??0);const represented=Date.UTC(get('year'),get('month')-1,get('day'),get('hour'),get('minute'));const delta=target-represented;if(delta===0)break;guess+=delta;}
   return new Date(guess);
 }
-export async function findAvailabilitySlots(repo:AvailabilityRepository,input:{tenantId:string;locationId?:string;serviceId:string;localDate:string;staffId?:string;resourceId?:string;optionIds?:string[];limit?:number},clock:()=>Date=()=>new Date()){
+export async function findAvailabilitySlots(repo:AvailabilityRepository,input:{tenantId:string;locationId?:string;serviceId:string;localDate:string;staffId?:string;resourceId?:string;optionIds?:string[];excludeBookingId?:string;limit?:number},clock:()=>Date=()=>new Date()){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(input.localDate))throw new AvailabilityValidationError('localDate must be YYYY-MM-DD');
   const tenantTimezone=await repo.getTenantTimezone(input.tenantId);let timeZone=tenantTimezone;if(input.locationId){const location=await repo.getLocation(input.tenantId,input.locationId);if(!location||!location.active)return[];timeZone=location.timezone??tenantTimezone;}
   const policy=await repo.getBookingPolicy(input.tenantId),limit=Math.min(Math.max(input.limit??12,1),48),engine=new AvailabilityEngine(repo,clock),slots:AvailabilityCandidate[]=[];
