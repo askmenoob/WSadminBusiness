@@ -1,14 +1,43 @@
+name: wsadmin-business
 services:
   db:
     image: postgres:17-alpine
     environment:
-      POSTGRES_DB: wsadmin_business
-      POSTGRES_USER: wsadmin_business
-      POSTGRES_PASSWORD: wsadmin_business_dev
-    ports: ["55432:5432"]
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports: ["127.0.0.1:55432:5432"]
     volumes: ["wsadmin_business_pg:/var/lib/postgresql/data"]
+    networks: [business]
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"], interval: 5s, timeout: 3s, retries: 15}
   redis:
     image: redis:8-alpine
-    ports: ["56379:6379"]
+    command: ["redis-server", "--appendonly", "yes"]
+    ports: ["127.0.0.1:56379:6379"]
+    volumes: ["wsadmin_business_redis:/data"]
+    networks: [business]
+    healthcheck: {test: ["CMD", "redis-cli", "ping"], interval: 5s, timeout: 3s, retries: 15}
+  api:
+    build: {context: ., dockerfile: Dockerfile.dev}
+    command: ["npm", "run", "dev:api"]
+    environment: {HOST: "0.0.0.0", PORT: "15280", DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}", REDIS_URL: "redis://redis:6379/0"}
+    ports: ["127.0.0.1:15280:15280"]
+    depends_on: {db: {condition: service_healthy}, redis: {condition: service_healthy}}
+    networks: [business]
+    healthcheck: {test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:15280/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"], interval: 10s, timeout: 5s, retries: 12}
+  worker:
+    build: {context: ., dockerfile: Dockerfile.dev}
+    command: ["npm", "run", "dev:worker"]
+    environment: {REDIS_URL: "redis://redis:6379/0"}
+    depends_on: {redis: {condition: service_healthy}}
+    networks: [business]
+  web:
+    build: {context: ., dockerfile: Dockerfile.dev}
+    command: ["npm", "run", "dev:web"]
+    ports: ["127.0.0.1:15281:15281"]
+    networks: [business]
 volumes:
-  wsadmin_business_pg:
+  wsadmin_business_pg: {name: wsadmin_business_pg}
+  wsadmin_business_redis: {name: wsadmin_business_redis}
+networks:
+  business: {name: wsadmin_business_net}

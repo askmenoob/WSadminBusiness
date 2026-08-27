@@ -1,9 +1,9 @@
+.git
 node_modules
+**/node_modules
 .env
 .env.*
 !.env.example
 dist
 coverage
 *.log
-.DS_Store
-.vscode

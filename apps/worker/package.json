@@ -1,0 +1,6 @@
+{
+  "name":"@wsadmin-business/worker","private":true,"type":"module",
+  "scripts":{"dev":"tsx src/index.ts","typecheck":"tsc --noEmit"},
+  "dependencies":{"ioredis":"^5.7.0"},
+  "devDependencies":{"@types/node":"^26.4.0","tsx":"^4.20.0","typescript":"^5.9.0"}
+}

@@ -1,0 +1,8 @@
+ M packages/database/prisma/schema.prisma
+ M packages/database/src/index.ts
+ M packages/provider/src/index.ts
+?? backups/
+?? packages/database/prisma/migrations/20260827034000_homestay_passive_collector/
+?? packages/database/src/homestay-collector.ts
+?? packages/provider/src/homestay-intelligence.ts
+?? packages/provider/src/openai-json-model.ts
