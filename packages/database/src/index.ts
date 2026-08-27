@@ -20,3 +20,4 @@ export { createBookingPolicyRepository } from './booking-policy.js';
 export { createCalendarControlRepository } from './calendar-controls.js';
 export { createServiceOptionRepository } from './service-options.js';
 export { createLocationRepository } from './locations.js';
+export { createWhatsAppInstanceRepository } from './whatsapp-instances.js';

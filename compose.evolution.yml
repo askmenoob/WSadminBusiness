@@ -1,0 +1,73 @@
+services:
+  evolution-postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: evolution
+      POSTGRES_USER: evolution
+      POSTGRES_PASSWORD_FILE: /run/secrets/evolution_postgres_password
+    secrets: [evolution_postgres_password]
+    volumes: [wsadmin_business_evolution_pg:/var/lib/postgresql/data]
+    networks: [business]
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U evolution -d evolution"], interval: 5s, timeout: 3s, retries: 20}
+  evolution-redis:
+    image: redis:7-alpine
+    command: ["/bin/sh","-ec","redis_password=$$(cat /run/secrets/evolution_redis_password); exec redis-server --appendonly yes --requirepass \"$$redis_password\""]
+    secrets: [evolution_redis_password]
+    volumes: [wsadmin_business_evolution_redis:/data]
+    networks: [business]
+    healthcheck: {test: ["CMD-SHELL", "REDISCLI_AUTH=$$(cat /run/secrets/evolution_redis_password) redis-cli ping"], interval: 5s, timeout: 3s, retries: 20}
+  evolution:
+    image: evoapicloud/evolution-api:v2.3.7@sha256:1bd8afc4a6cf48822e6cf02469aeae7bd35a12a6b616eacd1291926307f4d339
+    entrypoint: ["/bin/sh","/usr/local/bin/wsb-evolution-entrypoint.sh"]
+    environment:
+      AUTHENTICATION_API_KEY_FILE: /run/secrets/evolution_api_key
+      AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES: "false"
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_CLIENT_NAME: wsadmin-business-evolution
+      DATABASE_SAVE_DATA_INSTANCE: "true"
+      DATABASE_SAVE_DATA_NEW_MESSAGE: "true"
+      DATABASE_SAVE_MESSAGE_UPDATE: "true"
+      DATABASE_SAVE_DATA_CONTACTS: "true"
+      DATABASE_SAVE_DATA_CHATS: "true"
+      DATABASE_SAVE_DATA_LABELS: "true"
+      DATABASE_SAVE_DATA_HISTORIC: "true"
+      DATABASE_SAVE_IS_ON_WHATSAPP: "true"
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_LOCAL_ENABLED: "false"
+      CACHE_REDIS_PREFIX_KEY: wsb-evolution
+      CACHE_REDIS_SAVE_INSTANCES: "false"
+      EVOLUTION_POSTGRES_PASSWORD_FILE: /run/secrets/evolution_postgres_password
+      EVOLUTION_REDIS_PASSWORD_FILE: /run/secrets/evolution_redis_password
+      SERVER_PORT: "8080"
+      SERVER_URL: http://127.0.0.1:15282
+      TELEMETRY_ENABLED: "false"
+      WEBHOOK_GLOBAL_ENABLED: "false"
+      WEBSOCKET_ENABLED: "false"
+      LOG_LEVEL: ERROR,WARN,INFO
+      LOG_BAILEYS: error
+      LOG_COLOR: "false"
+      LANGUAGE: en
+      TZ: Asia/Kuala_Lumpur
+    secrets: [evolution_api_key,evolution_postgres_password,evolution_redis_password]
+    volumes:
+      - ./infra/evolution/entrypoint.sh:/usr/local/bin/wsb-evolution-entrypoint.sh:ro
+      - wsadmin_business_evolution_instances:/evolution/instances
+    ports: ["127.0.0.1:15282:8080"]
+    depends_on: {evolution-postgres: {condition: service_healthy}, evolution-redis: {condition: service_healthy}}
+    networks: [business]
+    healthcheck: {test: ["CMD","node","-e","fetch('http://127.0.0.1:8080').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"], interval: 10s, timeout: 5s, retries: 20, start_period: 60s}
+  api:
+    environment:
+      EVOLUTION_BASE_URL: http://evolution:8080
+      EVOLUTION_API_KEY_FILE: /run/secrets/evolution_api_key
+    secrets: [evolution_api_key]
+    depends_on:
+      evolution: {condition: service_healthy}
+secrets:
+  evolution_api_key: {file: ./.secrets/evolution_api_key}
+  evolution_postgres_password: {file: ./.secrets/evolution_postgres_password}
+  evolution_redis_password: {file: ./.secrets/evolution_redis_password}
+volumes:
+  wsadmin_business_evolution_pg: {name: wsadmin_business_evolution_pg}
+  wsadmin_business_evolution_redis: {name: wsadmin_business_evolution_redis}
+  wsadmin_business_evolution_instances: {name: wsadmin_business_evolution_instances}

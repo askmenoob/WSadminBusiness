@@ -1,0 +1,9 @@
+import type{Pool}from'pg';import type{WhatsAppInstance,WhatsAppInstanceRepository,WhatsAppStatus}from'@wsadmin-business/whatsapp';
+const map=(r:any):WhatsAppInstance=>({id:r.id,tenantId:r.tenant_id,provider:r.provider,providerInstanceName:r.provider_instance_name,displayName:r.display_name,phoneE164:r.phone_e164,status:r.status,qrExpiresAt:r.qr_expires_at,lastConnectedAt:r.last_connected_at,lastError:r.last_error,createdAt:r.created_at,updatedAt:r.updated_at});
+export function createWhatsAppInstanceRepository(pool:Pool):WhatsAppInstanceRepository{return{
+ async create(t,i){const r=await pool.query(`INSERT INTO whatsapp_instances(tenant_id,provider,provider_instance_name,display_name) VALUES($1,$2,$3,$4) RETURNING *`,[t,i.provider,i.providerInstanceName,i.displayName]);return map(r.rows[0]);},
+ async get(t){const r=await pool.query('SELECT * FROM whatsapp_instances WHERE tenant_id=$1',[t]);return r.rowCount?map(r.rows[0]):null;},
+ async updateState(t,i){const cur=await pool.query('SELECT * FROM whatsapp_instances WHERE tenant_id=$1',[t]);if(!cur.rowCount)throw new Error('whatsapp_instance_not_found');const x=cur.rows[0],has=(k:string)=>Object.prototype.hasOwnProperty.call(i,k);const r=await pool.query(`UPDATE whatsapp_instances SET status=$2,phone_e164=$3,qr_expires_at=$4,last_connected_at=$5,last_error=$6,updated_at=now() WHERE tenant_id=$1 RETURNING *`,[t,i.status,has('phoneE164')?i.phoneE164:x.phone_e164,has('qrExpiresAt')?i.qrExpiresAt:x.qr_expires_at,has('lastConnectedAt')?i.lastConnectedAt:x.last_connected_at,has('lastError')?i.lastError:x.last_error]);return map(r.rows[0]);},
+ async remove(t){const r=await pool.query('DELETE FROM whatsapp_instances WHERE tenant_id=$1',[t]);return Number(r.rowCount)>0;},
+ async event(t,id,eventType,status,detail={}){await pool.query('INSERT INTO whatsapp_instance_events(tenant_id,instance_id,event_type,status,detail) VALUES($1,$2,$3,$4,$5::jsonb)',[t,id,eventType,status,JSON.stringify(detail)]);}
+};}

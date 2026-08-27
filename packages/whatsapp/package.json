@@ -1,1 +1,14 @@
-{"name":"@wsadmin-business/whatsapp","private":true,"type":"module","scripts":{"typecheck":"tsc --noEmit"},"devDependencies":{"typescript":"^5.9.0"}}
+{
+  "name": "@wsadmin-business/whatsapp",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test src/*.test.ts"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0",
+    "tsx": "^4.20.0"
+  },
+  "exports": "./src/index.ts"
+}
