@@ -16,5 +16,6 @@ COPY packages/staff/package.json packages/staff/package.json
 COPY packages/resources/package.json packages/resources/package.json
 COPY packages/availability/package.json packages/availability/package.json
 COPY packages/calendar/package.json packages/calendar/package.json
+COPY packages/dashboard/package.json packages/dashboard/package.json
 RUN npm ci
 COPY . .

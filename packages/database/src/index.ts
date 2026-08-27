@@ -15,3 +15,4 @@ export { createResourceRepository } from './resources.js';
 export { createAvailabilityRepository } from './availability.js';
 export { createBookingRepository } from './bookings.js';
 export { createCalendarRepository } from './calendar.js';
+export { createDashboardRepository } from './dashboard.js';
