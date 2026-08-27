@@ -3,3 +3,4 @@ export type AiActionDecision={intent:string;confidence:number;requiresHuman:bool
 export function confidenceBand(value:number){if(value>=0.9)return'HIGH';if(value>=0.7)return'MEDIUM';return'LOW';}
 export * from './router.js';
 export * from './openai-compatible.js';
+export * from './intent.js';

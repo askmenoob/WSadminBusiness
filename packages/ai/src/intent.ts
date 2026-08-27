@@ -1,0 +1,15 @@
+import type{AiRouter}from'./router.js';
+export const AI_INTENTS=['BOOK','RESCHEDULE','CANCEL','PRICE','AVAILABILITY','FAQ','HANDOFF']as const;
+export type AiIntent=(typeof AI_INTENTS)[number];
+export type AiEntities={service:string|null;date:string|null;time:string|null;pax:number|null;staff:string|null;resource:string|null;location:string|null;budgetMinor:number|null};
+export type AiIntentResult={intent:AiIntent;confidence:number;language:'ms'|'en'|'mixed';entities:AiEntities;missing:string[];reason:string};
+export class AiIntentValidationError extends Error{constructor(message:string){super(message);this.name='AiIntentValidationError';}}
+const blank:AiEntities={service:null,date:null,time:null,pax:null,staff:null,resource:null,location:null,budgetMinor:null};
+function nullableText(v:unknown){return typeof v==='string'&&v.trim()?v.trim().slice(0,160):null;}
+function nullableInt(v:unknown){return Number.isInteger(v)&&Number(v)>=0?Number(v):null;}
+export function validateIntentPayload(raw:unknown):AiIntentResult{if(!raw||typeof raw!=='object')throw new AiIntentValidationError('intent payload must be object');const x=raw as any;if(!AI_INTENTS.includes(x.intent))throw new AiIntentValidationError('unsupported intent');const confidence=Number(x.confidence);if(!Number.isFinite(confidence)||confidence<0||confidence>1)throw new AiIntentValidationError('confidence must be 0..1');const language=['ms','en','mixed'].includes(x.language)?x.language:'mixed';const e=x.entities??{};return{intent:x.intent,confidence,language,entities:{...blank,service:nullableText(e.service),date:nullableText(e.date),time:nullableText(e.time),pax:nullableInt(e.pax),staff:nullableText(e.staff),resource:nullableText(e.resource),location:nullableText(e.location),budgetMinor:nullableInt(e.budgetMinor)},missing:Array.isArray(x.missing)?x.missing.filter((v:any)=>typeof v==='string').slice(0,10):[],reason:nullableText(x.reason)??'model_extraction'};}
+export interface IntentGenerator{generate(input:{tenantId:string;operation:string;messages:{role:'system'|'user'|'assistant';content:string}[];conversationId?:string|null}):Promise<{text:string}>;}
+export class AiIntentInterpreter{
+ constructor(private readonly router:Pick<AiRouter,'generate'>|IntentGenerator){}
+ async interpret(input:{tenantId:string;text:string;conversationId?:string|null}){const system='Return JSON only. Intent must be BOOK, RESCHEDULE, CANCEL, PRICE, AVAILABILITY, FAQ or HANDOFF. Extract service,date,time,pax,staff,resource,location,budgetMinor. Support Bahasa Melayu, English and mixed Malay-English. confidence is 0..1; missing lists required unresolved fields. Never invent unavailable business data.';const result=await this.router.generate({tenantId:input.tenantId,conversationId:input.conversationId,operation:'intent_extraction',messages:[{role:'system',content:system},{role:'user',content:input.text.slice(0,4000)}]});let raw:unknown;try{raw=JSON.parse(result.text);}catch{throw new AiIntentValidationError('model did not return valid JSON');}return validateIntentPayload(raw);}
+}
