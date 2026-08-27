@@ -23,3 +23,4 @@ export { createLocationRepository } from './locations.js';
 export { createWhatsAppInstanceRepository } from './whatsapp-instances.js';
 export { createWhatsAppProviderEventRepository } from './whatsapp-provider-events.js';
 export { createInboxRepository } from './inbox.js';
+export { createWhatsAppBookingFlowRepository } from './whatsapp-booking-flow.js';

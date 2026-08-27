@@ -20,7 +20,8 @@
     "@wsadmin-business/booking-policy": "*",
     "@wsadmin-business/locations": "*",
     "@wsadmin-business/whatsapp": "*",
-    "@wsadmin-business/inbox": "*"
+    "@wsadmin-business/inbox": "*",
+    "@wsadmin-business/whatsapp-booking": "*"
   },
   "devDependencies": {
     "@types/node": "^26.4.0",
