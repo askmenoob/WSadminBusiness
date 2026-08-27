@@ -1,4 +1,6 @@
 import { readFileSync } from 'node:fs';
+import type{WhatsAppMessageProvider,ProviderSendTextInput,ProviderSendTextResult,WhatsAppInboundAdapter}from'./provider.js';
+import{normalizeEvolutionWebhook}from'./webhooks.js';
 import{WhatsAppInstanceError,type WhatsAppConnectionProvider,type WhatsAppConnectionState,type WhatsAppPairingResult,type WhatsAppStatus}from'./connections.js';
 function statusOf(value:unknown):WhatsAppStatus{const s=String(value??'').toLowerCase();if(['open','connected','online'].includes(s))return'CONNECTED';if(['connecting','pairing'].includes(s))return'PAIRING';if(['close','closed','disconnected',''].includes(s))return'DISCONNECTED';return'ERROR';}
 function stateValue(payload:any){return payload?.instance?.state??payload?.state??payload?.instance?.status??payload?.status??null;}
@@ -14,3 +16,8 @@ export class EvolutionConnectionProvider implements WhatsAppConnectionProvider{
 }
 export class UnavailableWhatsAppConnectionProvider implements WhatsAppConnectionProvider{readonly providerName='EVOLUTION' as const;private fail():never{throw new WhatsAppInstanceError('WhatsApp provider is not configured','provider_config');}async provision(){return this.fail();}async pair(){return this.fail();}async state(){return this.fail();}async logout(){this.fail();}async remove(){this.fail();}}
 export function createWhatsAppConnectionProviderFromEnv(){const url=process.env.EVOLUTION_BASE_URL;let key=process.env.EVOLUTION_API_KEY;const file=process.env.EVOLUTION_API_KEY_FILE;if(!key&&file){try{key=readFileSync(file,'utf8').trim();}catch{key=undefined;}}return url&&key?new EvolutionConnectionProvider(url,key):new UnavailableWhatsAppConnectionProvider();}
+
+export class EvolutionMessageProvider extends EvolutionConnectionProvider implements WhatsAppMessageProvider{
+ async sendText(input:ProviderSendTextInput):Promise<ProviderSendTextResult>{const data=await (this as any).request(`/message/sendText/${encodeURIComponent(input.providerInstanceName)}`,{method:'POST',body:JSON.stringify({number:input.to.replace(/\D/g,''),text:input.text})});const id=data?.key?.id??data?.id??data?.messageId;if(!id)throw new WhatsAppInstanceError('Evolution sendText missing provider message id','provider_http');return{provider:'EVOLUTION',providerMessageId:String(id)};}
+}
+export class EvolutionInboundAdapter implements WhatsAppInboundAdapter{readonly providerName='EVOLUTION' as const;normalize(payload:unknown){return normalizeEvolutionWebhook(payload);}}

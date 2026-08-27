@@ -1,0 +1,4 @@
+import test from'node:test';import assert from'node:assert/strict';import{WhatsAppProviderRegistry,type WhatsAppMessageProvider,type WhatsAppInboundAdapter}from'./provider.js';
+const msg:WhatsAppMessageProvider={providerName:'EVOLUTION',async sendText(){return{provider:'EVOLUTION',providerMessageId:'m1'}}};
+const inbound:WhatsAppInboundAdapter={providerName:'EVOLUTION',normalize(){return{provider:'EVOLUTION',providerInstanceName:'x',providerEventKey:'k',eventName:'E',occurredAt:null,rawHash:'h',message:null}}};
+test('provider registry keeps business logic provider-neutral',async()=>{const r=new WhatsAppProviderRegistry().registerMessage(msg).registerInbound(inbound);assert.equal((await r.messageProvider('EVOLUTION').sendText({tenantId:'t',providerInstanceName:'i',to:'+601',text:'hi',idempotencyKey:'k'})).providerMessageId,'m1');assert.equal(r.inboundAdapter('EVOLUTION').normalize({}).provider,'EVOLUTION');assert.throws(()=>r.messageProvider('META_CLOUD'));});

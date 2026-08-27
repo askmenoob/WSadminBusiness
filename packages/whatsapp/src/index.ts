@@ -3,3 +3,4 @@ export const WHATSAPP_PROVIDER_POLICY = 'provider-neutral-business-services' as 
 export * from './connections.js';
 export * from './evolution.js';
 export * from './webhooks.js';
+export * from './provider.js';
