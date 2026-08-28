@@ -6,6 +6,7 @@ const read = path => readFileSync(resolve(root, path), 'utf8');
 const app = read('apps/web/src/App.tsx');
 const api = read('apps/web/src/api.ts');
 const publicBooking = read('apps/web/src/PublicBookingWorkspace.tsx');
+const aiKnowledge = read('apps/web/src/AIKnowledgeWorkspace.tsx');
 const entry = read('apps/web/src/main.tsx');
 const styles = read('apps/web/src/styles.css');
 const html = read('apps/web/index.html');
@@ -33,6 +34,9 @@ const checks = [
   ['Reduced motion is respected', styles.includes('prefers-reduced-motion:reduce')],
   ['Public booking exposes step state', publicBooking.includes("aria-current={index === step ? 'step'")],
   ['Public booking error is announced', publicBooking.includes('className="public-error" role="alert"')],
+  ['AI Knowledge owner training is routed', app.includes('SettingsWorkspace') && aiKnowledge.includes('Approve and teach AI')],
+  ['AI Knowledge exposes source traceability', aiKnowledge.includes('/ai/knowledge/sources') && aiKnowledge.includes('source.id')],
+  ['AI Knowledge preserves unanswered handoff', aiKnowledge.includes('AI will hand over and log this question')],
 ];
 
 const failed = checks.filter(([, passed]) => !passed);

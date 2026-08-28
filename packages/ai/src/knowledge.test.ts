@@ -1,3 +1,68 @@
-import test from'node:test';import assert from'node:assert/strict';import{GroundedFaqService,type AiKnowledgeRepository}from'./knowledge.js';
-class Repo implements AiKnowledgeRepository{async search(t:string){return[{id:`service:${t}:s1`,type:'SERVICE' as const,title:'Facial',content:'Price RM120.00, duration 60 minutes.'}];}async createFaq(t:string,i:any){return{id:'f',tenantId:t,question:i.question,answer:i.answer,active:true,sortOrder:0,createdAt:new Date(),updatedAt:new Date()};}async listFaq(){return[];}async updateFaq(){return null;}}
-test('grounded FAQ returns answer with source traceability',async()=>{const router={async generate(i:any){assert.match(i.messages[1].content,/RM120/);return{text:'Harga Facial ialah RM120.00.'};}};const out=await new GroundedFaqService(router as any,new Repo()).answer('tenant-a','berapa harga facial?');assert.equal(out?.answer,'Harga Facial ialah RM120.00.');assert.deepEqual(out?.sources,['service:tenant-a:s1']);});
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  GroundedFaqService,
+  buildKnowledgeQuery,
+  rankKnowledgeSources,
+  type AiKnowledgeRepository,
+  type FaqEntry,
+  type KnowledgeSource,
+  type UnansweredKnowledgeQuestion,
+} from './knowledge.js';
+
+const now = new Date('2026-08-29T00:00:00.000Z');
+
+class Repo implements AiKnowledgeRepository {
+  sources: KnowledgeSource[] = [{
+    id: 'service:tenant-a:s1',
+    type: 'SERVICE',
+    title: 'Facial',
+    content: 'Price RM120.00, duration 60 minutes.',
+  }];
+  unanswered: string[] = [];
+
+  async search() { return this.sources; }
+  async createFaq(tenantId: string, input: { question: string; answer: string }): Promise<FaqEntry> {
+    return { id: 'f', tenantId, question: input.question, answer: input.answer, active: true, sortOrder: 0, createdAt: now, updatedAt: now };
+  }
+  async listFaq() { return []; }
+  async updateFaq() { return null; }
+  async recordUnanswered(tenantId: string, question: string): Promise<UnansweredKnowledgeQuestion> {
+    this.unanswered.push(`${tenantId}:${question}`);
+    return { id: 'u1', tenantId, question, normalizedQuestion: question.toLowerCase(), occurrenceCount: 1, status: 'OPEN', firstAskedAt: now, lastAskedAt: now, resolvedAt: null, resolvedByFaqId: null };
+  }
+  async listUnanswered() { return []; }
+  async teachUnanswered() { return null; }
+}
+
+test('natural customer wording produces useful search terms and topics', () => {
+  const query = buildKnowledgeQuery('Berapa harga untuk facial premium?');
+  assert.equal(query.normalized, 'berapa harga untuk facial premium');
+  assert.deepEqual(query.terms, ['harga', 'facial', 'premium']);
+  assert.deepEqual(query.topics, ['PRICE']);
+});
+
+test('source ranking prefers the named service over broad price candidates', () => {
+  const plan = buildKnowledgeQuery('Berapa harga facial?');
+  const rows: KnowledgeSource[] = [
+    { id: 'service:massage', type: 'SERVICE', title: 'Massage', content: 'Price RM90.00.' },
+    { id: 'service:facial', type: 'SERVICE', title: 'Facial', content: 'Price RM120.00.' },
+  ];
+  assert.equal(rankKnowledgeSources(rows, plan, 2)[0]?.id, 'service:facial');
+});
+
+test('grounded FAQ returns answer with source traceability', async () => {
+  const router = { async generate(input: any) { assert.match(input.messages[1].content, /RM120/); return { text: 'Harga Facial ialah RM120.00.' }; } };
+  const out = await new GroundedFaqService(router as any, new Repo()).answer('tenant-a', 'berapa harga facial?');
+  assert.equal(out?.answer, 'Harga Facial ialah RM120.00.');
+  assert.deepEqual(out?.sources, ['service:tenant-a:s1']);
+});
+
+test('ungrounded questions are recorded once for owner training and handed off', async () => {
+  const repo = new Repo();
+  repo.sources = [];
+  const router = { async generate() { throw new Error('must not call the model without approved context'); } };
+  const out = await new GroundedFaqService(router as any, repo).answer('tenant-a', 'Ada servis untuk arnab?');
+  assert.equal(out, null);
+  assert.deepEqual(repo.unanswered, ['tenant-a:Ada servis untuk arnab?']);
+});
