@@ -27,6 +27,7 @@ const checks = [
   ['Mobile breakpoints are present', styles.includes('@media(max-width:560px)')],
   ['Keyboard focus is visible', styles.includes(':focus-visible')],
   ['Skip navigation is present', app.includes('className="skip-link"') && app.includes('id="main-content"')],
+  ['Skip navigation stays outside the application grid', app.indexOf('className="skip-link"') < app.indexOf('className="app-shell"')],
   ['Reduced motion is respected', styles.includes('prefers-reduced-motion:reduce')],
   ['Public booking exposes step state', publicBooking.includes("aria-current={index === step ? 'step'")],
   ['Public booking error is announced', publicBooking.includes('className="public-error" role="alert"')],

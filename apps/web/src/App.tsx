@@ -33,8 +33,9 @@ export function App() {
 
   if (publicTenantId) return <PublicBookingWorkspace tenantId={decodeURIComponent(publicTenantId)} />;
 
-  return <div className="app-shell">
+  return <>
     <a className="skip-link" href="#main-content">Skip to main content</a>
+    <div className="app-shell">
     <aside className={`app-sidebar ${mobileOpen ? 'open' : ''}`} aria-label="Primary navigation">
       <div className="brand-row"><div className="brand-mark">WS</div><div className="brand-copy"><strong>WSadmin</strong><span>Business</span></div><button className="mobile-close" onClick={() => setMobileOpen(false)} aria-label="Close navigation">×</button></div>
       <div className="tenant-switch"><span className="tenant-avatar">WB</span><div><strong>WSadmin Business UAT</strong><small>{uatRole.replaceAll('_', ' ')} · Kuala Lumpur</small></div><span className="chevron">⌄</span></div>
@@ -60,5 +61,6 @@ export function App() {
           : null}
       </div>
     </main>
-  </div>;
+    </div>
+  </>;
 }
