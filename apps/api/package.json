@@ -28,7 +28,8 @@
     "@wsadmin-business/whatsapp-booking": "*",
     "@wsadmin-business/ai": "*",
     "@wsadmin-business/treatments": "*",
-    "@wsadmin-business/automation": "*"
+    "@wsadmin-business/automation": "*",
+    "@wsadmin-business/payments": "*"
   },
   "devDependencies": {
     "@types/node": "^26.4.0",

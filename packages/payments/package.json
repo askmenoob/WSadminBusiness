@@ -1,0 +1,1 @@
+{"name":"@wsadmin-business/payments","private":true,"type":"module","exports":"./src/index.ts","scripts":{"typecheck":"tsc --noEmit","test":"tsx --test src/*.test.ts"},"devDependencies":{"tsx":"^4.20.0","typescript":"^5.9.0"}}

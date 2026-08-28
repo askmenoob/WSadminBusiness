@@ -5,6 +5,8 @@ import { AiBookingOrchestrator,AiIntentInterpreter,AiMemoryService,AiMultimodalI
 import { createAiBusinessTools,createAiKnowledgeRepository,createAutomationRepository,createLifecycleRepository,createMarketingRepository,createMessagingPolicyRepository,createAiMemoryRepository,createAiSettingsRepository,createAiUsageRepository,createCustomerCrmRepository,createCustomerControlRepository,createCustomerRepository,createTreatmentRepository,createTreatmentSharingRepository, createPool, createServiceOptionRepository,createServiceRepository, createStaffRepository, createStaffScheduleRepository, createResourceRepository, createAvailabilityRepository, createBookingPolicyRepository,createBookingRepository, createCalendarControlRepository,createCalendarRepository, createDashboardRepository,createLocationRepository,createWhatsAppInstanceRepository,createWhatsAppProviderEventRepository,createInboxRepository,createWhatsAppBookingFlowRepository,createWhatsAppBookingManagementRepository, probeDatabase } from '@wsadmin-business/database';
 import { registerAiMemoryRoutes } from './ai-memory-routes.js';
 import { registerAutomationRoutes } from './automation-routes.js';
+import { registerPaymentRoutes } from './payment-routes.js';
+import { createPaymentGatewayRegistryFromEnv } from '@wsadmin-business/payments';
 import { LifecycleAutomationService } from '@wsadmin-business/automation';
 import { registerAutomationLifecycleRoutes } from './automation-lifecycle-routes.js';
 import { registerMarketingRoutes } from './marketing-routes.js';
