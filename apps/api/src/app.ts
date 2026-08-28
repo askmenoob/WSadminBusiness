@@ -2,9 +2,11 @@ import Fastify from 'fastify';
 import { Redis } from 'ioredis';
 import { CAPABILITIES, ROLES, AccessDeniedError, authorize, type Actor, type Capability, type Role } from '@wsadmin-business/auth';
 import { AiBookingOrchestrator,AiIntentInterpreter,AiMemoryService,AiMultimodalIntakeService,AiRouter,GroundedFaqService,createTranscriptionProviderFromEnv,createAiProviderRegistryFromEnv } from '@wsadmin-business/ai';
-import { createAiBusinessTools,createAiKnowledgeRepository,createAutomationRepository,createAiMemoryRepository,createAiSettingsRepository,createAiUsageRepository,createCustomerCrmRepository,createCustomerControlRepository,createCustomerRepository,createTreatmentRepository,createTreatmentSharingRepository, createPool, createServiceOptionRepository,createServiceRepository, createStaffRepository, createStaffScheduleRepository, createResourceRepository, createAvailabilityRepository, createBookingPolicyRepository,createBookingRepository, createCalendarControlRepository,createCalendarRepository, createDashboardRepository,createLocationRepository,createWhatsAppInstanceRepository,createWhatsAppProviderEventRepository,createInboxRepository,createWhatsAppBookingFlowRepository,createWhatsAppBookingManagementRepository, probeDatabase } from '@wsadmin-business/database';
+import { createAiBusinessTools,createAiKnowledgeRepository,createAutomationRepository,createLifecycleRepository,createAiMemoryRepository,createAiSettingsRepository,createAiUsageRepository,createCustomerCrmRepository,createCustomerControlRepository,createCustomerRepository,createTreatmentRepository,createTreatmentSharingRepository, createPool, createServiceOptionRepository,createServiceRepository, createStaffRepository, createStaffScheduleRepository, createResourceRepository, createAvailabilityRepository, createBookingPolicyRepository,createBookingRepository, createCalendarControlRepository,createCalendarRepository, createDashboardRepository,createLocationRepository,createWhatsAppInstanceRepository,createWhatsAppProviderEventRepository,createInboxRepository,createWhatsAppBookingFlowRepository,createWhatsAppBookingManagementRepository, probeDatabase } from '@wsadmin-business/database';
 import { registerAiMemoryRoutes } from './ai-memory-routes.js';
 import { registerAutomationRoutes } from './automation-routes.js';
+import { LifecycleAutomationService } from '@wsadmin-business/automation';
+import { registerAutomationLifecycleRoutes } from './automation-lifecycle-routes.js';
 import { registerAiKnowledgeRoutes } from './ai-knowledge-routes.js';
 import { registerAiSettingsRoutes } from './ai-settings-routes.js';
 import { registerCustomerCrmRoutes } from './customer-crm-routes.js';
@@ -40,7 +42,11 @@ export function buildApp(options:{enableDevRbacProbe?:boolean;customerRepository
   app.get('/health',async(_request,reply)=>{try{const[database,cache]=await Promise.all([probeDatabase(pool),probeRedis()]);return{service:'wsadmin-business-api',status:'ok',product:'WSadmin Business',isolation:'mvoc-separate',database,cache,timezone:'Asia/Kuala_Lumpur'};}catch(error){reply.code(503);return{service:'wsadmin-business-api',status:'error',error:error instanceof Error?error.message:'health probe failed'};}});
   app.get('/api/v1',async()=>({name:'WSadmin Business API',version:'0.1.0',phase:'P1-booking-core',aiPolicy:'NO_DIRECT_DATABASE_WRITES'}));
   registerAiSettingsRoutes(app,createAiSettingsRepository(pool));
-  registerAutomationRoutes(app,createAutomationRepository(pool));
+  const automationRepository=createAutomationRepository(pool);
+  const lifecycleRepository=createLifecycleRepository(pool);
+  const lifecycleAutomation=new LifecycleAutomationService(lifecycleRepository,automationRepository);
+  registerAutomationRoutes(app,automationRepository);
+  registerAutomationLifecycleRoutes(app,lifecycleRepository,automationRepository);
   const aiKnowledgeRepository=createAiKnowledgeRepository(pool);
   registerAiKnowledgeRoutes(app,aiKnowledgeRepository);
   registerCustomerRoutes(app,options.customerRepository??createCustomerRepository(pool));
@@ -56,7 +62,8 @@ export function buildApp(options:{enableDevRbacProbe?:boolean;customerRepository
   const availabilityRepository=options.availabilityRepository??createAvailabilityRepository(pool);
   const bookingRepository=options.bookingRepository??createBookingRepository(pool);
   registerAvailabilityRoutes(app,availabilityRepository);
-  registerBookingRoutes(app,availabilityRepository,bookingRepository);
+  const lifecycleHooks=(options.bookingRepository||options.availabilityRepository)?undefined:lifecycleAutomation;
+  registerBookingRoutes(app,availabilityRepository,bookingRepository,lifecycleHooks);
   registerBookingPolicyRoutes(app,createBookingPolicyRepository(pool));
   registerCalendarRoutes(app,options.calendarRepository??createCalendarRepository(pool));
   registerCalendarControlRoutes(app,createCalendarControlRepository(pool));
@@ -66,7 +73,7 @@ export function buildApp(options:{enableDevRbacProbe?:boolean;customerRepository
   let webhookSecret=process.env.EVOLUTION_WEBHOOK_TOKEN;const webhookFile=process.env.EVOLUTION_WEBHOOK_TOKEN_FILE;if(!webhookSecret&&webhookFile){try{webhookSecret=readFileSync(webhookFile,'utf8').trim();}catch{webhookSecret=undefined;}}
   const inboxRepository=options.inboxRepository??createInboxRepository(pool);
   const bookingDomainService=new BookingService(availabilityRepository,bookingRepository);
-  const bookingFlow=new WhatsAppBookingFlowService(createWhatsAppBookingFlowRepository(pool),{findSlots:(input)=>findAvailabilitySlots(availabilityRepository,input),createBooking:(input)=>bookingDomainService.create(input)});
+  const bookingFlow=new WhatsAppBookingFlowService(createWhatsAppBookingFlowRepository(pool),{findSlots:(input)=>findAvailabilitySlots(availabilityRepository,input),createBooking:async(input)=>{const row=await bookingDomainService.create(input);if(row.status==='CONFIRMED'&&lifecycleHooks)await lifecycleHooks.planConfirmed(row.tenantId,row.id);return row;}});
   const bookingManagement=new WhatsAppBookingManagementService(createWhatsAppBookingManagementRepository(pool),{findSlots:(input)=>findAvailabilitySlots(availabilityRepository,input),reschedule:(input)=>bookingDomainService.reschedule(input),cancel:(tenantId,bookingId,actorUserId,reason)=>bookingDomainService.cancel(tenantId,bookingId,actorUserId,reason)});
   const aiRouter=new AiRouter(createAiSettingsRepository(pool),createAiUsageRepository(pool),createAiProviderRegistryFromEnv());
   const faqService=new GroundedFaqService(aiRouter,aiKnowledgeRepository);

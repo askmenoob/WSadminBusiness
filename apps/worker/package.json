@@ -10,7 +10,8 @@
     "ioredis": "^5.7.0",
     "@wsadmin-business/whatsapp-delivery": "*",
     "@wsadmin-business/database": "*",
-    "@wsadmin-business/whatsapp": "*"
+    "@wsadmin-business/whatsapp": "*",
+    "@wsadmin-business/automation": "*"
   },
   "devDependencies": {
     "@types/node": "^26.4.0",
