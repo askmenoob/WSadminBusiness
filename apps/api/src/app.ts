@@ -11,11 +11,12 @@ import { registerAdvancedBookingRoutes } from './advanced-booking-routes.js';
 import { registerPropertyRoutes } from './property-routes.js';
 import { registerSaasRoutes } from './saas-routes.js';
 import { registerPrivacyRoutes } from './privacy-routes.js';
-import { createPaymentGatewayRegistryFromEnv } from '@wsadmin-business/payments';
+import { PaymentService,createPaymentGatewayRegistryFromEnv } from '@wsadmin-business/payments';
 import { LifecycleAutomationService } from '@wsadmin-business/automation';
 import { registerAutomationLifecycleRoutes } from './automation-lifecycle-routes.js';
 import { registerMarketingRoutes } from './marketing-routes.js';
 import { registerMessagingPolicyRoutes } from './messaging-policy-routes.js';
+import { registerIntegrationStatusRoutes } from './integration-status-routes.js';
 import { registerAiKnowledgeRoutes } from './ai-knowledge-routes.js';
 import { registerAiSettingsRoutes } from './ai-settings-routes.js';
 import { registerCustomerCrmRoutes } from './customer-crm-routes.js';
@@ -63,7 +64,10 @@ export function buildApp(options:{enableDevRbacProbe?:boolean;customerRepository
   registerMessagingPolicyRoutes(app,messagingPolicyRepository);
   registerSaasRoutes(app,createSaasRepository(pool));
   registerPrivacyRoutes(app,createPrivacyRepository(pool));
-  registerPaymentRoutes(app,createPaymentRepository(pool),createPaymentGatewayRegistryFromEnv());
+  const paymentRepository=createPaymentRepository(pool);
+  const paymentGatewayRegistry=createPaymentGatewayRegistryFromEnv();
+  const paymentService=new PaymentService(paymentRepository,name=>paymentGatewayRegistry.get(name));
+  registerPaymentRoutes(app,paymentRepository,paymentGatewayRegistry);
   const aiKnowledgeRepository=createAiKnowledgeRepository(pool);
   registerAiKnowledgeRoutes(app,aiKnowledgeRepository);
   registerCustomerRoutes(app,options.customerRepository??createCustomerRepository(pool));
@@ -71,9 +75,11 @@ export function buildApp(options:{enableDevRbacProbe?:boolean;customerRepository
   registerTreatmentRoutes(app,createTreatmentRepository(pool));
   registerTreatmentSharingRoutes(app,createTreatmentSharingRepository(pool));
   registerCustomerCrmRoutes(app,createCustomerCrmRepository(pool));
-  registerServiceRoutes(app,options.serviceRepository??createServiceRepository(pool));
+  const serviceRepository=options.serviceRepository??createServiceRepository(pool);
+  registerServiceRoutes(app,serviceRepository);
   registerServiceOptionRoutes(app,createServiceOptionRepository(pool));
-  registerStaffRoutes(app,options.staffRepository??createStaffRepository(pool));
+  const staffRepository=options.staffRepository??createStaffRepository(pool);
+  registerStaffRoutes(app,staffRepository);
   registerStaffScheduleRoutes(app,options.staffScheduleRepository??createStaffScheduleRepository(pool));
   registerResourceRoutes(app,options.resourceRepository??createResourceRepository(pool));
   const availabilityRepository=options.availabilityRepository??createAvailabilityRepository(pool);
@@ -86,11 +92,19 @@ export function buildApp(options:{enableDevRbacProbe?:boolean;customerRepository
   registerCalendarControlRoutes(app,createCalendarControlRepository(pool));
   registerDashboardRoutes(app,options.dashboardRepository??createDashboardRepository(pool));
   registerLocationRoutes(app,createLocationRepository(pool));
-  registerWhatsAppInstanceRoutes(app,options.whatsappInstanceRepository??createWhatsAppInstanceRepository(pool),options.whatsappConnectionProvider??createWhatsAppConnectionProviderFromEnv());
+  const whatsappInstanceRepository=options.whatsappInstanceRepository??createWhatsAppInstanceRepository(pool);
+  registerIntegrationStatusRoutes(app,whatsappInstanceRepository);
+  registerWhatsAppInstanceRoutes(app,whatsappInstanceRepository,options.whatsappConnectionProvider??createWhatsAppConnectionProviderFromEnv());
   let webhookSecret=process.env.EVOLUTION_WEBHOOK_TOKEN;const webhookFile=process.env.EVOLUTION_WEBHOOK_TOKEN_FILE;if(!webhookSecret&&webhookFile){try{webhookSecret=readFileSync(webhookFile,'utf8').trim();}catch{webhookSecret=undefined;}}
   const inboxRepository=options.inboxRepository??createInboxRepository(pool);
   const bookingDomainService=new BookingService(availabilityRepository,bookingRepository);
-  registerAdvancedBookingRoutes(app,createAdvancedBookingRepository(pool),bookingDomainService);
+  const publicPaymentProvider=String(process.env.PAYMENT_PUBLIC_PROVIDER??(process.env.PAYMENT_PROVIDER_MODE==='MOCK'?'MOCK':'')).trim().toUpperCase();
+  registerAdvancedBookingRoutes(app,createAdvancedBookingRepository(pool),bookingDomainService,{
+    listServices:async tenantId=>(await serviceRepository.searchServices(tenantId,{active:true,limit:100,offset:0})).map(row=>({id:row.id,name:row.name,description:row.description,durationMinutes:row.durationMinutes,priceMinor:row.priceMinor,currency:row.currency})),
+    listStaff:async(tenantId,serviceId)=>{const rows=await staffRepository.listStaff(tenantId,false),eligibility=await Promise.all(rows.map(row=>staffRepository.isEligibleForService(tenantId,row.id,serviceId)));return rows.filter((row,index)=>row.active&&eligibility[index]).map(row=>({id:row.id,displayName:row.displayName,photoUrl:row.photoUrl}));},
+    findSlots:async input=>({timezone:await availabilityRepository.getTenantTimezone(input.tenantId),slots:await findAvailabilitySlots(availabilityRepository,input)}),
+    ...(publicPaymentProvider?{payment:{provider:publicPaymentProvider,create:input=>paymentService.create({...input,provider:publicPaymentProvider,purpose:'FULL',description:`Public booking ${input.bookingId}`})}}:{}),
+  });
   const bookingFlow=new WhatsAppBookingFlowService(createWhatsAppBookingFlowRepository(pool),{findSlots:(input)=>findAvailabilitySlots(availabilityRepository,input),createBooking:async(input)=>{const row=await bookingDomainService.create(input);if(row.status==='CONFIRMED'&&lifecycleHooks)await lifecycleHooks.planConfirmed(row.tenantId,row.id);return row;}});
   const bookingManagement=new WhatsAppBookingManagementService(createWhatsAppBookingManagementRepository(pool),{findSlots:(input)=>findAvailabilitySlots(availabilityRepository,input),reschedule:(input)=>bookingDomainService.reschedule(input),cancel:(tenantId,bookingId,actorUserId,reason)=>bookingDomainService.cancel(tenantId,bookingId,actorUserId,reason)});
   const aiRouter=new AiRouter(createAiSettingsRepository(pool),createAiUsageRepository(pool),createAiProviderRegistryFromEnv());
