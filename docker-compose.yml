@@ -34,6 +34,7 @@ services:
   web:
     build: {context: ., dockerfile: Dockerfile.dev}
     command: ["npm", "run", "dev:web"]
+    environment: {VITE_UAT_TENANT_ID: "${VITE_UAT_TENANT_ID:-}"}
     ports: ["192.168.0.102:15281:15281"]
     networks: [business]
 volumes:
