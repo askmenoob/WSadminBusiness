@@ -68,6 +68,7 @@ services:
       EVOLUTION_BASE_URL: http://evolution:8080
       EVOLUTION_API_KEY_FILE: /run/secrets/evolution_api_key
       EVOLUTION_WEBHOOK_TOKEN_FILE: /run/secrets/evolution_webhook_token
+      EVOLUTION_WEBHOOK_URL: http://api:15280/api/v1/webhooks/evolution
     secrets: [evolution_api_key,evolution_webhook_token]
     depends_on:
       evolution: {condition: service_healthy}
