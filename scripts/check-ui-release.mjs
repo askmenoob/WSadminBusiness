@@ -6,6 +6,7 @@ const read = path => readFileSync(resolve(root, path), 'utf8');
 const app = read('apps/web/src/App.tsx');
 const api = read('apps/web/src/api.ts');
 const publicBooking = read('apps/web/src/PublicBookingWorkspace.tsx');
+const entry = read('apps/web/src/main.tsx');
 const styles = read('apps/web/src/styles.css');
 const html = read('apps/web/index.html');
 
@@ -24,6 +25,7 @@ const checks = [
   ...requiredRoutes.map(name => [`${name} is routed`, app.includes(name)]),
   ['Public booking route is no-login', app.includes('/book\\/([^/]+)') && api.includes('export async function publicGet')],
   ['Responsive viewport is declared', html.includes('name="viewport"')],
+  ['Tunnel-served stylesheet is cache versioned', entry.includes("styles.css?v=")],
   ['Mobile breakpoints are present', styles.includes('@media(max-width:560px)')],
   ['Keyboard focus is visible', styles.includes(':focus-visible')],
   ['Skip navigation is present', app.includes('className="skip-link"') && app.includes('id="main-content"')],
