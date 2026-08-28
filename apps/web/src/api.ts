@@ -11,6 +11,14 @@ export type CalendarSnapshot={tenantId:string;locationId:string|null;view:'staff
 export type CalendarControlBlock={id:string;tenantId:string;scope:'TENANT'|'STAFF'|'RESOURCE';staffId:string|null;resourceId:string|null;type:'STOP_SALE'|'BLOCKED';startsAt:string;endsAt:string;recurrence:'NONE'|'DAILY'|'WEEKLY';recurrenceUntil:string|null;reason:string|null};
 
 export function tenantDelete(path:string){return tenantRequest<unknown>(path,{method:'DELETE'})}
+export type StaffProfile={id:string;displayName:string;phone:string|null;email:string|null;active:boolean;bookingCapacity:number;sortOrder:number};
+export type ServiceCategory={id:string;name:string;active:boolean;sortOrder:number};
+export type CatalogService={id:string;categoryId:string|null;name:string;description:string|null;durationMinutes:number;bufferBeforeMinutes:number;bufferAfterMinutes:number;priceMinor:number;currency:string;active:boolean;sortOrder:number};
+export type ServiceOptionGroup={id:string;serviceId:string;name:string;selectionMode:'SINGLE'|'MULTIPLE';required:boolean;active:boolean;sortOrder:number};
+export type ServiceOption={id:string;groupId:string;name:string;durationDeltaMinutes:number;priceDeltaMinor:number;requiredResourceType:string|null;active:boolean;sortOrder:number};
+export type BusinessResource={id:string;locationId:string|null;name:string;type:'ROOM'|'PROPERTY'|'EQUIPMENT'|'CHAIR'|'BAY'|'VEHICLE'|'OTHER';capacity:number;active:boolean;description:string|null};
+export type BusinessLocation={id:string;businessId:string;name:string;code:string;timezone:string|null;address:string|null;active:boolean;sortOrder:number};
+export type WeeklyHours={weekday:number;startMinute:number;endMinute:number};
 export type Customer={id:string;tenantId:string;name:string|null;phone:string|null;email:string|null;locale:string;status:'ACTIVE'|'ARCHIVED';createdAt:string;updatedAt:string};export type CustomerTag={id:string;tenantId:string;name:string;createdAt:string};
 export type CustomerNote={id:string;note:string;actorUserId:string|null;createdAt:string};export type CustomerFieldValue={definitionId:string;key:string;label:string;fieldType:'TEXT'|'NUMBER'|'BOOLEAN'|'DATE'|'JSON';value:unknown;updatedAt:string};export type TimelineItem={id:string;type:string;sourceType:string;sourceId:string|null;title:string;detail:Record<string,unknown>;occurredAt:string};
 export type CustomerCrm={tags:CustomerTag[];notes:CustomerNote[];customFields:CustomerFieldValue[];timeline:TimelineItem[]};export type CustomerRestriction={customerId:string;blacklisted:boolean;reason:string|null;blacklistedAt:string|null;mergedIntoCustomerId:string|null;mergedAt:string|null};

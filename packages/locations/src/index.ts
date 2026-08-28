@@ -1,5 +1,5 @@
 export type Location={id:string;tenantId:string;businessId:string;name:string;code:string;timezone:string|null;address:string|null;active:boolean;sortOrder:number;createdAt:Date;updatedAt:Date};
-export type CreateLocationInput={businessId:string;name:string;code:string;timezone?:string|null;address?:string|null;active?:boolean;sortOrder?:number};
+export type CreateLocationInput={businessId?:string;name:string;code:string;timezone?:string|null;address?:string|null;active?:boolean;sortOrder?:number};
 export type UpdateLocationInput=Partial<Omit<CreateLocationInput,'businessId'>>;
 export interface LocationRepository{
  create(tenantId:string,input:CreateLocationInput):Promise<Location>;
@@ -20,7 +20,7 @@ function timezoneOf(v:string|null|undefined){const x=text(v);if(!x)return null;t
 function order(v:number|undefined){const n=v??0;if(!Number.isInteger(n)||n<0)throw new LocationValidationError('sortOrder must be non-negative');return n;}
 export class LocationDirectory{
  constructor(private readonly repo:LocationRepository){}
- create(t:string,i:CreateLocationInput){if(!i.businessId?.trim())throw new LocationValidationError('businessId required');return this.repo.create(t,{...i,name:nameOf(i.name),code:codeOf(i.code),timezone:timezoneOf(i.timezone),address:text(i.address),active:i.active??true,sortOrder:order(i.sortOrder)});}
+ create(t:string,i:CreateLocationInput){return this.repo.create(t,{...i,businessId:text(i.businessId)??undefined,name:nameOf(i.name),code:codeOf(i.code),timezone:timezoneOf(i.timezone),address:text(i.address),active:i.active??true,sortOrder:order(i.sortOrder)});}
  async get(t:string,id:string){const r=await this.repo.get(t,id);if(!r)throw new LocationNotFoundError();return r;}
  list(t:string,inc=false){return this.repo.list(t,inc);}
  async update(t:string,id:string,i:UpdateLocationInput){const next={...i};if('name'in i&&i.name!==undefined)next.name=nameOf(i.name);if('code'in i&&i.code!==undefined)next.code=codeOf(i.code);if('timezone'in i)next.timezone=timezoneOf(i.timezone);if('address'in i)next.address=text(i.address);if('sortOrder'in i)next.sortOrder=order(i.sortOrder);const r=await this.repo.update(t,id,next);if(!r)throw new LocationNotFoundError();return r;}
