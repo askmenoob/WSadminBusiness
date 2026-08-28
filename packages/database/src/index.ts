@@ -36,3 +36,4 @@ export { createTreatmentRepository } from './treatments.js';
 export { createTreatmentSharingRepository } from './treatment-sharing.js';
 export { createAutomationRepository } from './automation.js';
 export { createLifecycleRepository } from './automation-lifecycle.js';
+export { createMarketingRepository } from './marketing.js';

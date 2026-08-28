@@ -21,7 +21,8 @@
     "test:treatments:db": "tsx scripts/treatment-csv-acceptance.ts",
     "test:treatment-sharing:db": "tsx scripts/treatment-sharing-acceptance.ts",
     "test:automation:db": "tsx scripts/automation-acceptance.ts",
-    "test:automation-lifecycle:db": "tsx scripts/automation-lifecycle-acceptance.ts"
+    "test:automation-lifecycle:db": "tsx scripts/automation-lifecycle-acceptance.ts",
+    "test:marketing:db": "tsx scripts/marketing-acceptance.ts"
   },
   "devDependencies": {
     "tsx": "^4.20.0"
