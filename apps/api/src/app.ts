@@ -2,12 +2,13 @@ import Fastify from 'fastify';
 import { Redis } from 'ioredis';
 import { CAPABILITIES, ROLES, AccessDeniedError, authorize, type Actor, type Capability, type Role } from '@wsadmin-business/auth';
 import { AiBookingOrchestrator,AiIntentInterpreter,AiMemoryService,AiMultimodalIntakeService,AiRouter,GroundedFaqService,createTranscriptionProviderFromEnv,createAiProviderRegistryFromEnv } from '@wsadmin-business/ai';
-import { createAiBusinessTools,createAiKnowledgeRepository,createAutomationRepository,createLifecycleRepository,createMarketingRepository,createAiMemoryRepository,createAiSettingsRepository,createAiUsageRepository,createCustomerCrmRepository,createCustomerControlRepository,createCustomerRepository,createTreatmentRepository,createTreatmentSharingRepository, createPool, createServiceOptionRepository,createServiceRepository, createStaffRepository, createStaffScheduleRepository, createResourceRepository, createAvailabilityRepository, createBookingPolicyRepository,createBookingRepository, createCalendarControlRepository,createCalendarRepository, createDashboardRepository,createLocationRepository,createWhatsAppInstanceRepository,createWhatsAppProviderEventRepository,createInboxRepository,createWhatsAppBookingFlowRepository,createWhatsAppBookingManagementRepository, probeDatabase } from '@wsadmin-business/database';
+import { createAiBusinessTools,createAiKnowledgeRepository,createAutomationRepository,createLifecycleRepository,createMarketingRepository,createMessagingPolicyRepository,createAiMemoryRepository,createAiSettingsRepository,createAiUsageRepository,createCustomerCrmRepository,createCustomerControlRepository,createCustomerRepository,createTreatmentRepository,createTreatmentSharingRepository, createPool, createServiceOptionRepository,createServiceRepository, createStaffRepository, createStaffScheduleRepository, createResourceRepository, createAvailabilityRepository, createBookingPolicyRepository,createBookingRepository, createCalendarControlRepository,createCalendarRepository, createDashboardRepository,createLocationRepository,createWhatsAppInstanceRepository,createWhatsAppProviderEventRepository,createInboxRepository,createWhatsAppBookingFlowRepository,createWhatsAppBookingManagementRepository, probeDatabase } from '@wsadmin-business/database';
 import { registerAiMemoryRoutes } from './ai-memory-routes.js';
 import { registerAutomationRoutes } from './automation-routes.js';
 import { LifecycleAutomationService } from '@wsadmin-business/automation';
 import { registerAutomationLifecycleRoutes } from './automation-lifecycle-routes.js';
 import { registerMarketingRoutes } from './marketing-routes.js';
+import { registerMessagingPolicyRoutes } from './messaging-policy-routes.js';
 import { registerAiKnowledgeRoutes } from './ai-knowledge-routes.js';
 import { registerAiSettingsRoutes } from './ai-settings-routes.js';
 import { registerCustomerCrmRoutes } from './customer-crm-routes.js';
@@ -49,6 +50,8 @@ export function buildApp(options:{enableDevRbacProbe?:boolean;customerRepository
   registerAutomationRoutes(app,automationRepository);
   registerAutomationLifecycleRoutes(app,lifecycleRepository,automationRepository);
   registerMarketingRoutes(app,createMarketingRepository(pool),automationRepository,process.env.WSADMIN_PUBLIC_BASE_URL??'http://192.168.0.102:15280');
+  const messagingPolicyRepository=createMessagingPolicyRepository(pool);
+  registerMessagingPolicyRoutes(app,messagingPolicyRepository);
   const aiKnowledgeRepository=createAiKnowledgeRepository(pool);
   registerAiKnowledgeRoutes(app,aiKnowledgeRepository);
   registerCustomerRoutes(app,options.customerRepository??createCustomerRepository(pool));
@@ -83,7 +86,7 @@ export function buildApp(options:{enableDevRbacProbe?:boolean;customerRepository
   registerAiMemoryRoutes(app,aiMemory);
   const aiOrchestrator=new AiBookingOrchestrator(new AiIntentInterpreter(aiRouter),createAiBusinessTools(pool,availabilityRepository,bookingRepository,faqService));
   const multimodalIntake=new AiMultimodalIntakeService(createEvolutionMediaResolverFromEnv(),createTranscriptionProviderFromEnv(),aiOrchestrator);
-  registerEvolutionWebhookRoutes(app,createWhatsAppProviderEventRepository(pool),createEvolutionWebhookVerifier(webhookSecret),inboxRepository,bookingFlow,bookingManagement,aiOrchestrator,aiMemory,multimodalIntake);
+  registerEvolutionWebhookRoutes(app,createWhatsAppProviderEventRepository(pool),createEvolutionWebhookVerifier(webhookSecret),inboxRepository,bookingFlow,bookingManagement,aiOrchestrator,aiMemory,multimodalIntake,messagingPolicyRepository);
   registerInboxRoutes(app,inboxRepository);
   if(options.enableDevRbacProbe){app.get('/api/v1/dev/rbac',async(request,reply)=>{const headers=request.headers;const role=String(headers['x-wsadmin-role']??'') as Role;const tenantId=String(headers['x-wsadmin-tenant-id']??'');const targetTenantId=String(headers['x-wsadmin-target-tenant-id']??tenantId);const capability=String(headers['x-wsadmin-capability']??'TENANT_READ') as Capability;if(!ROLES.includes(role)||!CAPABILITIES.includes(capability)||(!tenantId&&role!=='SYSTEM_OWNER'))return reply.code(400).send({error:'invalid_dev_actor'});const actor:Actor={userId:String(headers['x-wsadmin-user-id']??'dev-user'),role,...(tenantId?{tenantId}:{})};try{authorize(actor,targetTenantId,capability);return{allowed:true,role,tenantId:targetTenantId,capability};}catch(error){if(error instanceof AccessDeniedError)return reply.code(403).send({allowed:false,error:error.message});throw error;}});}
   app.addHook('onClose',async()=>{await pool.end();redis.disconnect();});

@@ -12,3 +12,4 @@ export class AutomationService{constructor(private readonly repo:AutomationRepos
 export * from './lifecycle.js';
 export * from './dispatcher.js';
 export * from './marketing.js';
+export * from './policy.js';

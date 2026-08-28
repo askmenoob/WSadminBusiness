@@ -37,3 +37,4 @@ export { createTreatmentSharingRepository } from './treatment-sharing.js';
 export { createAutomationRepository } from './automation.js';
 export { createLifecycleRepository } from './automation-lifecycle.js';
 export { createMarketingRepository } from './marketing.js';
+export { createMessagingPolicyRepository } from './messaging-policy.js';
