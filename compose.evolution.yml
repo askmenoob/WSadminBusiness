@@ -60,7 +60,9 @@ services:
     environment:
       EVOLUTION_BASE_URL: http://evolution:8080
       EVOLUTION_API_KEY_FILE: /run/secrets/evolution_api_key
-    secrets: [evolution_api_key]
+      OPENAI_API_KEY_FILE: /run/secrets/openai_api_key
+      GROQ_API_KEY_FILE: /run/secrets/groq_api_key
+    secrets: [evolution_api_key,openai_api_key,groq_api_key]
     depends_on:
       evolution: {condition: service_healthy}
   api:
@@ -69,10 +71,14 @@ services:
       EVOLUTION_API_KEY_FILE: /run/secrets/evolution_api_key
       EVOLUTION_WEBHOOK_TOKEN_FILE: /run/secrets/evolution_webhook_token
       EVOLUTION_WEBHOOK_URL: http://api:15280/api/v1/webhooks/evolution
-    secrets: [evolution_api_key,evolution_webhook_token]
+      OPENAI_API_KEY_FILE: /run/secrets/openai_api_key
+      GROQ_API_KEY_FILE: /run/secrets/groq_api_key
+    secrets: [evolution_api_key,evolution_webhook_token,openai_api_key,groq_api_key]
     depends_on:
       evolution: {condition: service_healthy}
 secrets:
+  groq_api_key: {file: ./.secrets/groq_api_key}
+  openai_api_key: {file: ./.secrets/openai_api_key}
   evolution_api_key: {file: ./.secrets/evolution_api_key}
   evolution_webhook_token: {file: ./.secrets/evolution_webhook_token}
   evolution_postgres_password: {file: ./.secrets/evolution_postgres_password}
