@@ -34,7 +34,7 @@ services:
   web:
     build: {context: ., dockerfile: Dockerfile.dev}
     command: ["npm", "run", "dev:web"]
-    ports: ["127.0.0.1:15281:15281"]
+    ports: ["192.168.0.102:15281:15281"]
     networks: [business]
 volumes:
   wsadmin_business_pg: {name: wsadmin_business_pg}
