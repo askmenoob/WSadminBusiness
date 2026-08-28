@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { EvolutionConnectionProvider } from './evolution.js';
+import { EvolutionConnectionProvider, EvolutionMessageProvider } from './evolution.js';
 test('connected state resolves phone from Evolution ownerJid fallback',async()=>{
  const calls:string[]=[];const original=globalThis.fetch;
  globalThis.fetch=async(input)=>{const url=String(input);calls.push(url);if(url.includes('/instance/connectionState/'))return new Response(JSON.stringify({instance:{state:'open'}}),{status:200});if(url.includes('/instance/fetchInstances'))return new Response(JSON.stringify([{instance:{ownerJid:'60123456789@s.whatsapp.net'}}]),{status:200});return new Response('{}',{status:404});};
@@ -10,4 +10,9 @@ test('provision configures Evolution webhook for inbound events',async()=>{
  const calls:Array<{url:string;body:any}>=[];const original=globalThis.fetch;
  globalThis.fetch=async(input,init)=>{const url=String(input);const body=init?.body?JSON.parse(String(init.body)):null;calls.push({url,body});if(url.endsWith('/instance/create'))return new Response(JSON.stringify({instance:{status:'connecting'}}),{status:201});if(url.includes('/webhook/set/'))return new Response(JSON.stringify({enabled:true}),{status:201});return new Response('{}',{status:200});};
  try{const p=new EvolutionConnectionProvider('http://evolution','k',{url:'http://api:15280/api/v1/webhooks/evolution',token:'uat-token'});await p.provision('wsb-test');assert.equal(calls.length,2);assert.match(calls[1]!.url,/\/webhook\/set\/wsb-test$/);assert.equal(calls[1]!.body.webhook.headers['x-wsadmin-webhook-token'],'uat-token');assert.ok(calls[1]!.body.webhook.events.includes('MESSAGES_UPSERT'));}finally{globalThis.fetch=original;}
+});
+test('Evolution sendText preserves group JID recipient',async()=>{
+ const original=globalThis.fetch;let sent:any=null;
+ globalThis.fetch=async(_input,init)=>{sent=JSON.parse(String(init?.body??'{}'));return new Response(JSON.stringify({key:{id:'m-group'}}),{status:200});};
+ try{const p=new EvolutionMessageProvider('http://evolution','k');const r=await p.sendText({tenantId:'t',providerInstanceName:'i',to:'60132195990-1508049801@g.us',text:'hi group',idempotencyKey:'k'});assert.equal(sent.number,'60132195990-1508049801@g.us');assert.equal(r.providerMessageId,'m-group');}finally{globalThis.fetch=original;}
 });
