@@ -11,11 +11,12 @@ export function createCustomerControlRepository(pool:Pool):CustomerControlReposi
   await c.query('DELETE FROM customer_custom_field_values WHERE tenant_id=$1 AND customer_id=$2',[t,source]);
   const bookings=await move(c,'UPDATE bookings SET customer_id=$2 WHERE tenant_id=$1 AND customer_id=$3',[t,target,source]);
   const conversations=await move(c,'UPDATE whatsapp_conversations SET customer_id=$2,updated_at=now() WHERE tenant_id=$1 AND customer_id=$3',[t,target,source]);
+  const treatments=await move(c,'UPDATE treatment_records SET customer_id=$2,updated_at=now() WHERE tenant_id=$1 AND customer_id=$3',[t,target,source]);
   const notes=await move(c,'UPDATE customer_notes SET customer_id=$2,updated_at=now() WHERE tenant_id=$1 AND customer_id=$3',[t,target,source]);
   const events=await move(c,'UPDATE customer_activity_events SET customer_id=$2 WHERE tenant_id=$1 AND customer_id=$3',[t,target,source]);
   await c.query(`UPDATE customers SET name=coalesce(name,'Merged customer'),phone=NULL,email=NULL,status='ARCHIVED',merged_into_customer_id=$3,merged_at=now(),updated_at=now() WHERE tenant_id=$1 AND id=$2`,[t,source,target]);
   const tr=await c.query(`UPDATE customers SET name=coalesce(name,$3),phone=coalesce(phone,$4),email=coalesce(email,$5),blacklisted=(blacklisted OR $6::boolean),blacklist_reason=CASE WHEN blacklist_reason IS NOT NULL THEN blacklist_reason WHEN $6 THEN $7 ELSE NULL END,blacklisted_at=CASE WHEN blacklisted THEN blacklisted_at WHEN $6 THEN coalesce($8,now()) ELSE NULL END,updated_at=now() WHERE tenant_id=$1 AND id=$2 RETURNING id`,[t,target,sourceRow.name,sourceRow.phone,sourceRow.email,sourceRow.blacklisted,sourceRow.blacklist_reason,sourceRow.blacklisted_at]);
-  if(!tr.rowCount)throw new Error('customer_not_found');const mergedAt=new Date();const detail={bookings,conversations,notes,events,tags,customFields:fields};
+  if(!tr.rowCount)throw new Error('customer_not_found');const mergedAt=new Date();const detail={bookings,conversations,treatments,notes,events,tags,customFields:fields};
   await c.query(`INSERT INTO customer_merge_history(tenant_id,source_customer_id,target_customer_id,actor_user_id,detail,created_at) VALUES($1,$2,$3,$4,$5::jsonb,$6)`,[t,source,target,actor,JSON.stringify(detail),mergedAt]);
   await c.query(`INSERT INTO customer_activity_events(tenant_id,customer_id,event_type,source_type,source_id,title,detail,occurred_at) VALUES($1,$2,'CUSTOMER_MERGED','CRM',$3,'Customer records merged',$4::jsonb,$5)`,[t,target,source,JSON.stringify({sourceCustomerId:source,...detail,actorUserId:actor}),mergedAt]);
   await c.query('COMMIT');return{sourceCustomerId:source,targetCustomerId:target,moved:detail,mergedAt} satisfies CustomerMergeResult;
