@@ -1,0 +1,2 @@
+# GitHub recovery drill
+`./scripts/github-restore-drill.sh` clones `askmenoob/WSadminBusiness` branch `dev` into a clean temporary directory, confirms local HEAD equals remote HEAD, installs only declared dependencies, creates a disposable database, runs the complete migration chain, then runs the repository check/build gates. Runtime database credentials come from the documented operator environment; no unpushed source files are copied into the clone. The disposable database and checkout are removed after the drill.

@@ -29,7 +29,8 @@
     "@wsadmin-business/payments": "*",
     "@wsadmin-business/advanced-booking": "*",
     "@wsadmin-business/verticals": "*",
-    "@wsadmin-business/saas": "*"
+    "@wsadmin-business/saas": "*",
+    "@wsadmin-business/privacy": "*"
   },
   "devDependencies": {
     "@types/node": "^26.4.0",

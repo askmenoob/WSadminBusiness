@@ -1,0 +1,2 @@
+# WSadmin Business observability
+Every API response carries `x-request-id`. Structured `http_request` logs include requestId, tenantId, method, URL, statusCode and elapsedMs. Domain audit tables retain booking IDs, payment IDs, automation job IDs, WhatsApp message/event IDs, AI action/audit IDs, treatment share events and advanced integration events. Operators can correlate customer reports without exposing message secrets.

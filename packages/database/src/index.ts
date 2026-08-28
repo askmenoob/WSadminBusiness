@@ -42,3 +42,4 @@ export { createPaymentRepository } from './payments.js';
 export { createAdvancedBookingRepository } from './advanced-booking.js';
 export { createPropertyRepository } from './vertical-properties.js';
 export { createSaasRepository } from './saas.js';
+export { createPrivacyRepository } from './privacy.js';

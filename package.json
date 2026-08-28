@@ -27,7 +27,12 @@
     "test:payments:db": "tsx scripts/payment-acceptance.ts",
     "test:advanced-booking:db": "tsx scripts/advanced-booking-acceptance.ts",
     "test:property-vertical:db": "tsx scripts/property-vertical-acceptance.ts",
-    "test:saas:db": "tsx scripts/saas-acceptance.ts"
+    "test:saas:db": "tsx scripts/saas-acceptance.ts",
+    "test:security-privacy:db": "tsx scripts/security-privacy-acceptance.ts",
+    "test:performance:db": "tsx scripts/performance-acceptance.ts",
+    "test:e2e-technical:db": "tsx scripts/e2e-technical-uat.ts",
+    "uat:seed": "tsx scripts/uat-seed.ts",
+    "uat:preflight": "tsx scripts/uat-preflight.ts"
   },
   "devDependencies": {
     "tsx": "^4.20.0"

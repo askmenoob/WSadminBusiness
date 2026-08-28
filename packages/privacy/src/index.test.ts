@@ -1,0 +1,1 @@
+import test from'node:test';import assert from'node:assert/strict';import{EncryptedFieldService}from'./index.js';test('AES-GCM secure values round trip without plaintext storage',()=>{const c=new EncryptedFieldService(Buffer.alloc(32,7)),e=c.encrypt('secret-value');assert.notEqual(e.ciphertext,'secret-value');assert.equal(c.decrypt(e),'secret-value');});
