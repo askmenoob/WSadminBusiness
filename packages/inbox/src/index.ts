@@ -2,7 +2,7 @@ import type{NormalizedWhatsAppEvent,WhatsAppProviderEventRecord}from'@wsadmin-bu
 export const CONVERSATION_STATUSES=['OPEN','HUMAN','BOT_PAUSED','CLOSED'] as const;
 export type ConversationStatus=(typeof CONVERSATION_STATUSES)[number];
 export type Conversation={id:string;tenantId:string;instanceId:string;customerId:string|null;channel:'WHATSAPP';remoteJid:string;contactE164:string|null;displayName:string|null;status:ConversationStatus;unreadCount:number;lastMessageAt:Date|null;lastMessagePreview:string|null;aiIntent?:string|null;aiConfidence?:number|null;aiAction?:'EXECUTE'|'CLARIFY'|'HANDOFF'|null;aiReason?:string|null;aiAttentionState?:'NONE'|'CLARIFICATION'|'HUMAN';aiUpdatedAt?:Date|null;createdAt:Date;updatedAt:Date};
-export type InboxMessage={id:string;tenantId:string;conversationId:string;providerEventId:string;providerMessageId:string|null;direction:'INBOUND'|'OUTBOUND';senderJid:string|null;messageType:string|null;textContent:string|null;occurredAt:Date;status:string;createdAt:Date};
+export type InboxMessage={id:string;tenantId:string;conversationId:string;providerEventId:string;providerMessageId:string|null;direction:'INBOUND'|'OUTBOUND';senderJid:string|null;messageType:string|null;textContent:string|null;occurredAt:Date;status:string;mediaKind?:'AUDIO'|'IMAGE'|'VIDEO'|'DOCUMENT'|null;mediaMimeType?:string|null;mediaSizeBytes?:number|null;createdAt:Date};
 export type ConversationSearch={status?:ConversationStatus;q?:string;limit?:number;offset?:number};
 export interface InboxRepository{
  project(eventRecord:WhatsAppProviderEventRecord,event:NormalizedWhatsAppEvent):Promise<{conversation:Conversation;message:InboxMessage}|null>;

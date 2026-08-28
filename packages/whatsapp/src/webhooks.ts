@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { WhatsAppProviderName } from './connections.js';
-export type NormalizedWhatsAppEvent={provider:WhatsAppProviderName;providerInstanceName:string;providerEventKey:string;eventName:string;occurredAt:Date|null;rawHash:string;message:{providerMessageId:string|null;remoteJid:string|null;fromMe:boolean|null;participant:string|null;text:string|null;messageType:string|null}|null};
+export type NormalizedWhatsAppEvent={provider:WhatsAppProviderName;providerInstanceName:string;providerEventKey:string;eventName:string;occurredAt:Date|null;rawHash:string;message:{providerMessageId:string|null;remoteJid:string|null;fromMe:boolean|null;participant:string|null;text:string|null;messageType:string|null;media?:{kind:'AUDIO'|'IMAGE'|'VIDEO'|'DOCUMENT';mimeType:string;sizeBytes:number|null;caption:string|null}|null}|null};
 export type WhatsAppProviderEventRecord={id:string;tenantId:string;instanceId:string;provider:WhatsAppProviderName;providerInstanceName:string;providerEventKey:string;eventName:string;occurredAt:Date|null;receivedAt:Date};
 export interface WhatsAppProviderEventRepository{
  resolveInstance(provider:WhatsAppProviderName,providerInstanceName:string):Promise<{id:string;tenantId:string}|null>;
@@ -11,6 +11,7 @@ function object(v:unknown):Record<string,any>{return typeof v==='object'&&v!==nu
 function stable(v:unknown):string{if(Array.isArray(v))return`[${v.map(stable).join(',')}]`;if(typeof v==='object'&&v!==null){const o=v as Record<string,unknown>;return`{${Object.keys(o).sort().map(k=>JSON.stringify(k)+':'+stable(o[k])).join(',')}}`;}return JSON.stringify(v);}
 function dateOf(value:unknown){if(value===null||value===undefined||value==='')return null;const n=Number(value);if(Number.isFinite(n)&&String(value).trim()!=='')return new Date(n>2e10?n:n*1000);const d=new Date(String(value));return Number.isNaN(d.valueOf())?null:d;}
 function textOf(message:any):string|null{return message?.conversation??message?.extendedTextMessage?.text??message?.imageMessage?.caption??message?.videoMessage?.caption??null;}
+function mediaOf(message:any){const specs:[string,'AUDIO'|'IMAGE'|'VIDEO'|'DOCUMENT'][]=[['audioMessage','AUDIO'],['imageMessage','IMAGE'],['videoMessage','VIDEO'],['documentMessage','DOCUMENT']];for(const[key,kind]of specs){const m=message?.[key];if(!m)continue;const mime=String(m.mimetype??'application/octet-stream');const n=Number(m.fileLength??m.fileSize??NaN);return{kind,mimeType:mime,sizeBytes:Number.isFinite(n)?n:null,caption:textOf(message)};}return null;}
 export function normalizeEvolutionWebhook(payload:unknown):NormalizedWhatsAppEvent{
   const root=object(payload),data=object(root.data),instanceObject=object(root.instance);
   const providerInstanceName=String(root.instanceName??root.instance??instanceObject.instanceName??instanceObject.name??data.instanceName??'').trim();
@@ -22,7 +23,7 @@ export function normalizeEvolutionWebhook(payload:unknown):NormalizedWhatsAppEve
   const rawHash=createHash('sha256').update(stable(payload)).digest('hex');
   const providerEventKey=providerMessageId?`${eventName}:${providerMessageId}`:`${eventName}:sha256:${rawHash}`;
   const hasMessage=Object.keys(message).length>0||providerMessageId!==null||key.remoteJid!==undefined;
-  return{provider:'EVOLUTION',providerInstanceName,providerEventKey,eventName,occurredAt,rawHash,message:hasMessage?{providerMessageId,remoteJid:key.remoteJid?String(key.remoteJid):null,fromMe:typeof key.fromMe==='boolean'?key.fromMe:null,participant:key.participant?String(key.participant):null,text:textOf(message),messageType:data.messageType?String(data.messageType):null}:null};
+  return{provider:'EVOLUTION',providerInstanceName,providerEventKey,eventName,occurredAt,rawHash,message:hasMessage?{providerMessageId,remoteJid:key.remoteJid?String(key.remoteJid):null,fromMe:typeof key.fromMe==='boolean'?key.fromMe:null,participant:key.participant?String(key.participant):null,text:textOf(message),messageType:data.messageType?String(data.messageType):null,media:mediaOf(message)}:null};
 }
 export class WhatsAppWebhookIngestionService{
  constructor(private readonly repo:WhatsAppProviderEventRepository){}

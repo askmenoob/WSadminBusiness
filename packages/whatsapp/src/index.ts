@@ -4,3 +4,4 @@ export * from './connections.js';
 export * from './evolution.js';
 export * from './webhooks.js';
 export * from './provider.js';
+export * from './media.js';

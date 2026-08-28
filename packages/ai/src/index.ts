@@ -9,3 +9,5 @@ export * from './orchestrator.js';
 export * from './security.js';
 export * from './knowledge.js';
 export * from './memory.js';
+export * from './multimodal.js';
+export * from './transcription.js';

@@ -1,0 +1,6 @@
+import type{AiTranscriptionProvider,ResolvedMedia}from'./multimodal.js';
+export class OpenAiCompatibleTranscriber implements AiTranscriptionProvider{
+ constructor(readonly name:string,private readonly baseUrl:string,private readonly apiKey:string,private readonly model:string){}
+ async transcribe(input:ResolvedMedia){const form=new FormData();form.set('model',this.model);const bytes=Uint8Array.from(input.bytes);form.set('file',new Blob([bytes.buffer],{type:input.mimeType}),input.fileName);const r=await fetch(`${this.baseUrl.replace(/\/$/,'')}/audio/transcriptions`,{method:'POST',headers:{authorization:`Bearer ${this.apiKey}`},body:form});const body:any=await r.json().catch(()=>({}));if(!r.ok)throw new Error(body?.error?.message??`transcription HTTP ${r.status}`);return{text:String(body?.text??''),confidence:null};}
+}
+export function createTranscriptionProviderFromEnv(){if(process.env.GROQ_API_KEY)return new OpenAiCompatibleTranscriber('GROQ',process.env.GROQ_BASE_URL??'https://api.groq.com/openai/v1',process.env.GROQ_API_KEY,process.env.GROQ_TRANSCRIPTION_MODEL??'whisper-large-v3-turbo');if(process.env.OPENAI_API_KEY)return new OpenAiCompatibleTranscriber('OPENAI',process.env.OPENAI_BASE_URL??'https://api.openai.com/v1',process.env.OPENAI_API_KEY,process.env.OPENAI_TRANSCRIPTION_MODEL??'gpt-4o-mini-transcribe');return null;}

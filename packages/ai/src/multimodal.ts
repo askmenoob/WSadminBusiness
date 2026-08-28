@@ -1,0 +1,18 @@
+import type{AiOrchestratorResult}from'./orchestrator.js';
+export type MediaKind='AUDIO'|'IMAGE'|'VIDEO'|'DOCUMENT';
+export type SafeMediaReference={providerInstanceName:string;providerMessageId:string;kind:MediaKind;mimeType:string;sizeBytes:number|null;caption:string|null};
+export type ResolvedMedia={bytes:Uint8Array;mimeType:string;fileName:string};
+export interface AiMediaResolver{resolve(ref:SafeMediaReference):Promise<ResolvedMedia>;}
+export interface AiTranscriptionProvider{readonly name:string;transcribe(input:ResolvedMedia):Promise<{text:string;confidence?:number|null}>;}
+export interface MultimodalDownstream{handle(input:{tenantId:string;conversationId:string;instanceId:string;remoteJid:string;customerId?:string|null;text:string;eventKey:string;contextSummary?:string|null}):Promise<AiOrchestratorResult>;}
+const max:Record<MediaKind,number>={AUDIO:25*1024*1024,IMAGE:10*1024*1024,VIDEO:50*1024*1024,DOCUMENT:20*1024*1024};
+const allowed={AUDIO:/^audio\/(ogg|opus|mpeg|mp4|wav|webm)/i,IMAGE:/^image\/(jpeg|png|webp)/i,VIDEO:/^video\/(mp4|webm|quicktime)/i,DOCUMENT:/^(application\/pdf|text\/plain)/i};
+export function validateMediaReference(ref:SafeMediaReference){if(!ref.providerMessageId||!ref.providerInstanceName)throw new Error('media reference missing provider identity');if(!allowed[ref.kind].test(ref.mimeType))throw new Error('unsupported media mime type');if(ref.sizeBytes!==null&&ref.sizeBytes>max[ref.kind])throw new Error('media exceeds size limit');return ref;}
+export class AiMultimodalIntakeService{
+ constructor(private readonly resolver:AiMediaResolver,private readonly transcriber:AiTranscriptionProvider|null,private readonly downstream:MultimodalDownstream){}
+ async handle(input:{tenantId:string;conversationId:string;instanceId:string;remoteJid:string;customerId?:string|null;eventKey:string;contextSummary?:string|null;media:SafeMediaReference}){let ref:SafeMediaReference;try{ref=validateMediaReference(input.media);}catch(e){return{handled:false,action:'HANDOFF' as const,intent:'HANDOFF',confidence:0,reason:e instanceof Error?e.message:'media_validation',reply:null,outboundMessageId:null,bookingId:null};}
+  if(ref.kind==='AUDIO'){if(!this.transcriber)return{handled:false,action:'HANDOFF' as const,intent:'HANDOFF',confidence:0,reason:'transcriber_unavailable',reply:null,outboundMessageId:null,bookingId:null};try{const media=await this.resolver.resolve(ref);if(media.bytes.byteLength>max.AUDIO)throw new Error('media exceeds size limit');const t=await this.transcriber.transcribe(media);const text=t.text.trim();if(!text||(t.confidence!==undefined&&t.confidence!==null&&t.confidence<.65))return{handled:false,action:'HANDOFF' as const,intent:'HANDOFF',confidence:t.confidence??0,reason:'transcription_uncertain',reply:null,outboundMessageId:null,bookingId:null};return this.downstream.handle({tenantId:input.tenantId,conversationId:input.conversationId,instanceId:input.instanceId,remoteJid:input.remoteJid,customerId:input.customerId,text,eventKey:`${input.eventKey}:voice`,contextSummary:input.contextSummary});}catch{return{handled:false,action:'HANDOFF' as const,intent:'HANDOFF',confidence:0,reason:'media_resolution_or_transcription_failed',reply:null,outboundMessageId:null,bookingId:null};}}
+  if(ref.caption?.trim())return this.downstream.handle({tenantId:input.tenantId,conversationId:input.conversationId,instanceId:input.instanceId,remoteJid:input.remoteJid,customerId:input.customerId,text:ref.caption.trim(),eventKey:`${input.eventKey}:media-caption`,contextSummary:input.contextSummary});
+  return{handled:false,action:'HANDOFF' as const,intent:'HANDOFF',confidence:0,reason:'media_requires_human_review',reply:null,outboundMessageId:null,bookingId:null};
+ }
+}
