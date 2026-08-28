@@ -28,3 +28,4 @@ export { createWhatsAppBookingManagementRepository } from './whatsapp-booking-ma
 export { createDeliveryRepository } from './whatsapp-delivery.js';
 export { createAiSettingsRepository,createAiUsageRepository } from './ai.js';
 export { createAiBusinessTools } from './ai-business-tools.js';
+export { createAiKnowledgeRepository } from './ai-knowledge.js';

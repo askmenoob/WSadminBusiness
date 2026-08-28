@@ -7,3 +7,4 @@ export * from './intent.js';
 export * from './confidence.js';
 export * from './orchestrator.js';
 export * from './security.js';
+export * from './knowledge.js';
