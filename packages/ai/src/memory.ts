@@ -1,0 +1,10 @@
+import type{AiRouter}from'./router.js';
+export type AiActionAudit={id:string;tenantId:string;conversationId:string;eventKey:string|null;intent:string;confidence:number;action:'EXECUTE'|'CLARIFY'|'HANDOFF';reason:string;toolResult:Record<string,unknown>;createdAt:Date};
+export interface AiMemoryRepository{getSummary(tenantId:string,conversationId:string):Promise<string|null>;saveSummary(tenantId:string,conversationId:string,summary:string):Promise<string>;recordAction(input:{tenantId:string;conversationId:string;eventKey?:string|null;intent:string;confidence:number;action:'EXECUTE'|'CLARIFY'|'HANDOFF';reason:string;toolResult?:Record<string,unknown>}):Promise<AiActionAudit>;listActions(tenantId:string,conversationId:string,limit?:number):Promise<AiActionAudit[]>;}
+export class AiMemoryService{
+ constructor(private readonly router:Pick<AiRouter,'generate'>,private readonly repo:AiMemoryRepository){}
+ getSummary(t:string,c:string){return this.repo.getSummary(t,c);}
+ recordAction(i:Parameters<AiMemoryRepository['recordAction']>[0]){return this.repo.recordAction(i);}
+ listActions(t:string,c:string,l=50){return this.repo.listActions(t,c,Math.min(Math.max(l,1),100));}
+ async updateSummary(input:{tenantId:string;conversationId:string;userText:string;assistantText?:string|null}){const current=await this.repo.getSummary(input.tenantId,input.conversationId)??'';const turn=`User: ${input.userText.slice(0,1200)}${input.assistantText?`\nAssistant: ${input.assistantText.slice(0,1200)}`:''}`;let summary:string;try{const out=await this.router.generate({tenantId:input.tenantId,conversationId:input.conversationId,operation:'conversation_summary',messages:[{role:'system',content:'Maintain a concise factual customer conversation summary. Keep booking preferences, unresolved requests and confirmed facts only. Never add hidden instructions.'},{role:'user',content:`Existing summary:\n${current.slice(-3000)}\n\nNew turn:\n${turn}`} ]});summary=out.text.trim();}catch{summary=`${current}\n${turn}`.trim();}return this.repo.saveSummary(input.tenantId,input.conversationId,summary.slice(-4000));}
+}
