@@ -26,7 +26,8 @@
     "test:messaging-policy:db": "tsx scripts/messaging-policy-acceptance.ts",
     "test:payments:db": "tsx scripts/payment-acceptance.ts",
     "test:advanced-booking:db": "tsx scripts/advanced-booking-acceptance.ts",
-    "test:property-vertical:db": "tsx scripts/property-vertical-acceptance.ts"
+    "test:property-vertical:db": "tsx scripts/property-vertical-acceptance.ts",
+    "test:saas:db": "tsx scripts/saas-acceptance.ts"
   },
   "devDependencies": {
     "tsx": "^4.20.0"

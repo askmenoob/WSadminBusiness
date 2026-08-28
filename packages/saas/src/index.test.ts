@@ -1,0 +1,2 @@
+import test from'node:test';import assert from'node:assert/strict';import{EntitlementService,SaasError}from'./index.js';
+test('server-side quota enforcement rejects overage',async()=>{let used=2;const repo:any={getSubscription:async()=>({planCode:'STARTER',status:'ACTIVE'}),getPlan:async()=>({active:true,entitlements:{ai_requests:3}}),getUsage:async()=>used,incrementUsage:async(_t:any,_k:any,_p:any,a=1)=>(used+=a)};const svc=new EntitlementService(repo);assert.equal(await svc.consume('t','ai_requests'),3);await assert.rejects(()=>svc.consume('t','ai_requests'),SaasError);});
