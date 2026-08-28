@@ -29,7 +29,8 @@
     "@wsadmin-business/ai": "*",
     "@wsadmin-business/treatments": "*",
     "@wsadmin-business/automation": "*",
-    "@wsadmin-business/payments": "*"
+    "@wsadmin-business/payments": "*",
+    "@wsadmin-business/advanced-booking": "*"
   },
   "devDependencies": {
     "@types/node": "^26.4.0",

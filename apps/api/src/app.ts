@@ -6,6 +6,7 @@ import { createAiBusinessTools,createAiKnowledgeRepository,createAutomationRepos
 import { registerAiMemoryRoutes } from './ai-memory-routes.js';
 import { registerAutomationRoutes } from './automation-routes.js';
 import { registerPaymentRoutes } from './payment-routes.js';
+import { registerAdvancedBookingRoutes } from './advanced-booking-routes.js';
 import { createPaymentGatewayRegistryFromEnv } from '@wsadmin-business/payments';
 import { LifecycleAutomationService } from '@wsadmin-business/automation';
 import { registerAutomationLifecycleRoutes } from './automation-lifecycle-routes.js';

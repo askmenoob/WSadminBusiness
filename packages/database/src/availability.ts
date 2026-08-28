@@ -37,6 +37,6 @@ export function createAvailabilityRepository(pool:Pool):AvailabilityRepository{r
     const r=q.staffId
       ?await pool.query(`SELECT count(*)::int AS count FROM bookings WHERE tenant_id=$1 AND staff_id=$2 AND status IN ('PENDING','CONFIRMED') AND effective_starts_at<$4 AND $3<effective_ends_at AND ($5::uuid IS NULL OR id<>$5::uuid)`,[q.tenantId,q.staffId,q.startsAt,q.endsAt,q.excludeBookingId??null])
       :await pool.query(`SELECT count(*)::int AS count FROM bookings WHERE tenant_id=$1 AND resource_id=$2 AND status IN ('PENDING','CONFIRMED') AND effective_starts_at<$4 AND $3<effective_ends_at AND ($5::uuid IS NULL OR id<>$5::uuid)`,[q.tenantId,q.resourceId,q.startsAt,q.endsAt,q.excludeBookingId??null]);
-    return Number(r.rows[0]?.count??0);
+    const internal=Number(r.rows[0]?.count??0);let external=0;try{const e=q.staffId?await pool.query(`SELECT count(*)::int count FROM external_booking_events WHERE tenant_id=$1 AND staff_id=$2 AND starts_at<$4 AND $3<ends_at`,[q.tenantId,q.staffId,q.startsAt,q.endsAt]):await pool.query(`SELECT count(*)::int count FROM external_booking_events WHERE tenant_id=$1 AND resource_id=$2 AND starts_at<$4 AND $3<ends_at`,[q.tenantId,q.resourceId,q.startsAt,q.endsAt]);external=Number(e.rows[0]?.count??0);}catch(error:any){if(error?.code!=='42P01')throw error;}return internal+external;
   }
 };}

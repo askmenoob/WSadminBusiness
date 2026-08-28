@@ -39,3 +39,4 @@ export { createLifecycleRepository } from './automation-lifecycle.js';
 export { createMarketingRepository } from './marketing.js';
 export { createMessagingPolicyRepository } from './messaging-policy.js';
 export { createPaymentRepository } from './payments.js';
+export { createAdvancedBookingRepository } from './advanced-booking.js';
