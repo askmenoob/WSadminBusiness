@@ -1,7 +1,7 @@
 import type{NormalizedWhatsAppEvent,WhatsAppProviderEventRecord}from'@wsadmin-business/whatsapp';
 export const CONVERSATION_STATUSES=['OPEN','HUMAN','BOT_PAUSED','CLOSED'] as const;
 export type ConversationStatus=(typeof CONVERSATION_STATUSES)[number];
-export type Conversation={id:string;tenantId:string;instanceId:string;customerId:string|null;channel:'WHATSAPP';remoteJid:string;contactE164:string|null;displayName:string|null;status:ConversationStatus;unreadCount:number;lastMessageAt:Date|null;lastMessagePreview:string|null;createdAt:Date;updatedAt:Date};
+export type Conversation={id:string;tenantId:string;instanceId:string;customerId:string|null;channel:'WHATSAPP';remoteJid:string;contactE164:string|null;displayName:string|null;status:ConversationStatus;unreadCount:number;lastMessageAt:Date|null;lastMessagePreview:string|null;aiIntent?:string|null;aiConfidence?:number|null;aiAction?:'EXECUTE'|'CLARIFY'|'HANDOFF'|null;aiReason?:string|null;aiAttentionState?:'NONE'|'CLARIFICATION'|'HUMAN';aiUpdatedAt?:Date|null;createdAt:Date;updatedAt:Date};
 export type InboxMessage={id:string;tenantId:string;conversationId:string;providerEventId:string;providerMessageId:string|null;direction:'INBOUND'|'OUTBOUND';senderJid:string|null;messageType:string|null;textContent:string|null;occurredAt:Date;status:string;createdAt:Date};
 export type ConversationSearch={status?:ConversationStatus;q?:string;limit?:number;offset?:number};
 export interface InboxRepository{
@@ -11,6 +11,7 @@ export interface InboxRepository{
  listMessages(tenantId:string,conversationId:string,limit:number,offset:number):Promise<InboxMessage[]>;
  updateStatus(tenantId:string,conversationId:string,status:ConversationStatus):Promise<Conversation|null>;
  markRead(tenantId:string,conversationId:string):Promise<Conversation|null>;
+ recordAiState?(tenantId:string,conversationId:string,input:{intent:string;confidence:number;action:'EXECUTE'|'CLARIFY'|'HANDOFF';reason:string;attentionState:'NONE'|'CLARIFICATION'|'HUMAN'}):Promise<Conversation|null>;
 }
 export class InboxValidationError extends Error{constructor(message:string){super(message);this.name='InboxValidationError';}}
 export class ConversationNotFoundError extends Error{constructor(){super('Conversation not found');this.name='ConversationNotFoundError';}}
@@ -23,4 +24,5 @@ export class InboxService{
  async messages(tenantId:string,id:string,limit=50,offset=0){await this.get(tenantId,id);return this.repo.listMessages(tenantId,id,Math.min(Math.max(limit,1),100),Math.max(offset,0));}
  async status(tenantId:string,id:string,status:ConversationStatus){if(!CONVERSATION_STATUSES.includes(status))throw new InboxValidationError('invalid conversation status');const row=await this.repo.updateStatus(tenantId,id,status);if(!row)throw new ConversationNotFoundError();return row;}
  async markRead(tenantId:string,id:string){const row=await this.repo.markRead(tenantId,id);if(!row)throw new ConversationNotFoundError();return row;}
+ async recordAiState(tenantId:string,id:string,input:{intent:string;confidence:number;action:'EXECUTE'|'CLARIFY'|'HANDOFF';reason:string;attentionState:'NONE'|'CLARIFICATION'|'HUMAN'}){if(!this.repo.recordAiState)return null;const row=await this.repo.recordAiState(tenantId,id,input);if(!row)throw new ConversationNotFoundError();return row;}
 }
