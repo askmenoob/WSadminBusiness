@@ -62,3 +62,4 @@ export class CustomerService {
   async archive(tenantId:string,id:string){return this.update(tenantId,id,{status:'ARCHIVED'});}
 }
 export * from './crm.js';
+export * from './restrictions.js';

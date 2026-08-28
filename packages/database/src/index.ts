@@ -31,3 +31,4 @@ export { createAiBusinessTools } from './ai-business-tools.js';
 export { createAiKnowledgeRepository } from './ai-knowledge.js';
 export { createAiMemoryRepository } from './ai-memory.js';
 export { createCustomerCrmRepository } from './customer-crm.js';
+export { createCustomerControlRepository } from './customer-controls.js';

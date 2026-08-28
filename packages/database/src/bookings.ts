@@ -5,6 +5,7 @@ const mapAudit=(r:any):BookingAuditEvent=>({id:r.id,tenantId:r.tenant_id,booking
 async function writeAudit(c:PoolClient,args:{tenantId:string;bookingId:string;actorUserId?:string|null;eventType:string;fromStatus?:string|null;toStatus?:string|null;metadata?:Record<string,unknown>}){
   await c.query('INSERT INTO booking_audit_events(tenant_id,booking_id,actor_user_id,event_type,from_status,to_status,metadata) VALUES($1,$2,$3,$4,$5,$6,$7::jsonb)',[args.tenantId,args.bookingId,args.actorUserId??null,args.eventType,args.fromStatus??null,args.toStatus??null,JSON.stringify(args.metadata??{})]);
 }
+async function assertCustomerSelfBookable(c:PoolClient,i:PersistBookingInput){if(!i.customerId||!['WHATSAPP','WEB'].includes(i.source))return;const r=await c.query('SELECT status,blacklisted,merged_into_customer_id FROM customers WHERE tenant_id=$1 AND id=$2 FOR SHARE',[i.tenantId,i.customerId]);if(!r.rowCount)throw new BookingConflictError('customer not found');const x=r.rows[0];if(x.blacklisted)throw new BookingConflictError('customer is blacklisted from self-booking');if(x.status!=='ACTIVE'||x.merged_into_customer_id)throw new BookingConflictError('customer cannot self-book');}
 async function lockAndCheckCapacity(c:PoolClient,args:{tenantId:string;serviceId:string;staffId:string;resourceId:string|null;startsAt:Date;endsAt:Date;excludeBookingId?:string}){
   const service=await c.query('SELECT id FROM services WHERE tenant_id=$1 AND id=$2 AND active=true FOR SHARE',[args.tenantId,args.serviceId]);
   if(!service.rowCount)throw new BookingConflictError('service is inactive or unavailable');
@@ -32,6 +33,7 @@ export function createBookingRepository(pool:Pool):BookingRepository{return{
     const c=await pool.connect();
     try{
       await c.query('BEGIN');
+      await assertCustomerSelfBookable(c,i);
       await lockAndCheckCapacity(c,{tenantId:i.tenantId,serviceId:i.serviceId,staffId:i.staffId,resourceId:i.resourceId,startsAt:i.effectiveStartsAt,endsAt:i.effectiveEndsAt});
       const inserted=await c.query(`INSERT INTO bookings(tenant_id,location_id,customer_id,service_id,staff_id,resource_id,status,source,assignment_mode,notes,duration_minutes,base_price_minor,option_price_minor,price_minor,currency,starts_at,ends_at,effective_starts_at,effective_ends_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING *`,[i.tenantId,i.locationId,i.customerId,i.serviceId,i.staffId,i.resourceId,i.status,i.source,i.assignmentMode,i.notes,i.durationMinutes,i.basePriceMinor,i.optionPriceMinor,i.priceMinor,i.currency,i.startsAt,i.endsAt,i.effectiveStartsAt,i.effectiveEndsAt]);
       const row=map(inserted.rows[0]);row.optionIds=[...i.optionIds];
@@ -46,6 +48,7 @@ export function createBookingRepository(pool:Pool):BookingRepository{return{
     const c=await pool.connect();const rows:Booking[]=[];
     try{await c.query('BEGIN');
       for(const i of inputs){
+        await assertCustomerSelfBookable(c,i);
         await lockAndCheckCapacity(c,{tenantId:i.tenantId,serviceId:i.serviceId,staffId:i.staffId,resourceId:i.resourceId,startsAt:i.effectiveStartsAt,endsAt:i.effectiveEndsAt});
         const inserted=await c.query(`INSERT INTO bookings(tenant_id,location_id,customer_id,service_id,staff_id,resource_id,status,source,assignment_mode,notes,duration_minutes,base_price_minor,option_price_minor,price_minor,currency,starts_at,ends_at,effective_starts_at,effective_ends_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING *`,[i.tenantId,i.locationId,i.customerId,i.serviceId,i.staffId,i.resourceId,i.status,i.source,i.assignmentMode,i.notes,i.durationMinutes,i.basePriceMinor,i.optionPriceMinor,i.priceMinor,i.currency,i.startsAt,i.endsAt,i.effectiveStartsAt,i.effectiveEndsAt]);
         const row=map(inserted.rows[0]);row.optionIds=[...i.optionIds];for(const optionId of i.optionIds)await c.query('INSERT INTO booking_service_options(tenant_id,booking_id,option_id) VALUES($1,$2,$3)',[i.tenantId,row.id,optionId]);rows.push(row);
