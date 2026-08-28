@@ -12,3 +12,6 @@ test('staff cannot manage service catalog',()=>{assert.throws(()=>authorize({use
 test('staff cannot manage staff directory',()=>{assert.throws(()=>authorize({userId:'u',role:'STAFF',tenantId:'ta'},'ta','STAFF_WRITE'),AccessDeniedError);});
 
 test('staff cannot manage resources',()=>{assert.throws(()=>authorize({userId:'u',role:'STAFF',tenantId:'ta'},'ta','RESOURCE_WRITE'),AccessDeniedError);});
+
+test('manager may share treatment records',()=>assert.equal(authorize({userId:'m',role:'MANAGER',tenantId:'tenant-a'},'tenant-a','TREATMENT_SHARE_WRITE'),true));
+test('staff cannot share treatment records',()=>assert.throws(()=>authorize({userId:'s',role:'STAFF',tenantId:'tenant-a'},'tenant-a','TREATMENT_SHARE_WRITE'),AccessDeniedError));

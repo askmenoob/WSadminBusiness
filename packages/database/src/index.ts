@@ -33,3 +33,4 @@ export { createAiMemoryRepository } from './ai-memory.js';
 export { createCustomerCrmRepository } from './customer-crm.js';
 export { createCustomerControlRepository } from './customer-controls.js';
 export { createTreatmentRepository } from './treatments.js';
+export { createTreatmentSharingRepository } from './treatment-sharing.js';

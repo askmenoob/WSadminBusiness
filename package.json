@@ -18,7 +18,8 @@
     "db:migrate": "npm run migrate -w @wsadmin-business/database",
     "test:booking-core:db": "tsx scripts/booking-core-acceptance.ts",
     "test:customer-merge:db": "tsx scripts/customer-merge-acceptance.ts",
-    "test:treatments:db": "tsx scripts/treatment-csv-acceptance.ts"
+    "test:treatments:db": "tsx scripts/treatment-csv-acceptance.ts",
+    "test:treatment-sharing:db": "tsx scripts/treatment-sharing-acceptance.ts"
   },
   "devDependencies": {
     "tsx": "^4.20.0"
