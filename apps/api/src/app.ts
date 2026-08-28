@@ -2,8 +2,9 @@ import Fastify from 'fastify';
 import { Redis } from 'ioredis';
 import { CAPABILITIES, ROLES, AccessDeniedError, authorize, type Actor, type Capability, type Role } from '@wsadmin-business/auth';
 import { AiBookingOrchestrator,AiIntentInterpreter,AiMemoryService,AiMultimodalIntakeService,AiRouter,GroundedFaqService,createTranscriptionProviderFromEnv,createAiProviderRegistryFromEnv } from '@wsadmin-business/ai';
-import { createAiBusinessTools,createAiKnowledgeRepository,createAiMemoryRepository,createAiSettingsRepository,createAiUsageRepository,createCustomerCrmRepository,createCustomerControlRepository,createCustomerRepository,createTreatmentRepository,createTreatmentSharingRepository, createPool, createServiceOptionRepository,createServiceRepository, createStaffRepository, createStaffScheduleRepository, createResourceRepository, createAvailabilityRepository, createBookingPolicyRepository,createBookingRepository, createCalendarControlRepository,createCalendarRepository, createDashboardRepository,createLocationRepository,createWhatsAppInstanceRepository,createWhatsAppProviderEventRepository,createInboxRepository,createWhatsAppBookingFlowRepository,createWhatsAppBookingManagementRepository, probeDatabase } from '@wsadmin-business/database';
+import { createAiBusinessTools,createAiKnowledgeRepository,createAutomationRepository,createAiMemoryRepository,createAiSettingsRepository,createAiUsageRepository,createCustomerCrmRepository,createCustomerControlRepository,createCustomerRepository,createTreatmentRepository,createTreatmentSharingRepository, createPool, createServiceOptionRepository,createServiceRepository, createStaffRepository, createStaffScheduleRepository, createResourceRepository, createAvailabilityRepository, createBookingPolicyRepository,createBookingRepository, createCalendarControlRepository,createCalendarRepository, createDashboardRepository,createLocationRepository,createWhatsAppInstanceRepository,createWhatsAppProviderEventRepository,createInboxRepository,createWhatsAppBookingFlowRepository,createWhatsAppBookingManagementRepository, probeDatabase } from '@wsadmin-business/database';
 import { registerAiMemoryRoutes } from './ai-memory-routes.js';
+import { registerAutomationRoutes } from './automation-routes.js';
 import { registerAiKnowledgeRoutes } from './ai-knowledge-routes.js';
 import { registerAiSettingsRoutes } from './ai-settings-routes.js';
 import { registerCustomerCrmRoutes } from './customer-crm-routes.js';
@@ -39,6 +40,7 @@ export function buildApp(options:{enableDevRbacProbe?:boolean;customerRepository
   app.get('/health',async(_request,reply)=>{try{const[database,cache]=await Promise.all([probeDatabase(pool),probeRedis()]);return{service:'wsadmin-business-api',status:'ok',product:'WSadmin Business',isolation:'mvoc-separate',database,cache,timezone:'Asia/Kuala_Lumpur'};}catch(error){reply.code(503);return{service:'wsadmin-business-api',status:'error',error:error instanceof Error?error.message:'health probe failed'};}});
   app.get('/api/v1',async()=>({name:'WSadmin Business API',version:'0.1.0',phase:'P1-booking-core',aiPolicy:'NO_DIRECT_DATABASE_WRITES'}));
   registerAiSettingsRoutes(app,createAiSettingsRepository(pool));
+  registerAutomationRoutes(app,createAutomationRepository(pool));
   const aiKnowledgeRepository=createAiKnowledgeRepository(pool);
   registerAiKnowledgeRoutes(app,aiKnowledgeRepository);
   registerCustomerRoutes(app,options.customerRepository??createCustomerRepository(pool));
