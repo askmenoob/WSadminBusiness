@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT=$(pwd); set -a; source "$ROOT/.env"; set +a
-TMP=$(mktemp -d /tmp/wsadmin-business-github-restore.XXXXXX); DB="wsb_github_restore_$(date +%s)_$$"
+BASE=${WSADMIN_RESTORE_BASE:-/home/askme/.wsadmin-recovery}; mkdir -p "$BASE"; TMP=$(mktemp -d "$BASE/github-restore.XXXXXX"); DB="wsb_github_restore_$(date +%s)_$$"
 cleanup(){ cd "$ROOT"; docker compose exec -T db dropdb -U "$POSTGRES_USER" --if-exists "$DB" >/dev/null 2>&1 || true; rm -rf "$TMP"; }
 trap cleanup EXIT
 gh repo clone askmenoob/WSadminBusiness "$TMP/repo" -- --branch dev --single-branch >/dev/null
