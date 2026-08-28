@@ -2,11 +2,12 @@ import Fastify from 'fastify';
 import { Redis } from 'ioredis';
 import { CAPABILITIES, ROLES, AccessDeniedError, authorize, type Actor, type Capability, type Role } from '@wsadmin-business/auth';
 import { AiBookingOrchestrator,AiIntentInterpreter,AiMemoryService,AiMultimodalIntakeService,AiRouter,GroundedFaqService,createTranscriptionProviderFromEnv,createAiProviderRegistryFromEnv } from '@wsadmin-business/ai';
-import { createAiBusinessTools,createAiKnowledgeRepository,createAutomationRepository,createLifecycleRepository,createMarketingRepository,createMessagingPolicyRepository,createAiMemoryRepository,createAiSettingsRepository,createAiUsageRepository,createCustomerCrmRepository,createCustomerControlRepository,createCustomerRepository,createTreatmentRepository,createTreatmentSharingRepository, createPool, createServiceOptionRepository,createServiceRepository, createStaffRepository, createStaffScheduleRepository, createResourceRepository, createAvailabilityRepository, createBookingPolicyRepository,createBookingRepository, createCalendarControlRepository,createCalendarRepository, createDashboardRepository,createLocationRepository,createWhatsAppInstanceRepository,createWhatsAppProviderEventRepository,createInboxRepository,createWhatsAppBookingFlowRepository,createWhatsAppBookingManagementRepository, probeDatabase } from '@wsadmin-business/database';
+import { createAiBusinessTools,createAiKnowledgeRepository,createAutomationRepository,createPaymentRepository,createAdvancedBookingRepository,createPropertyRepository,createLifecycleRepository,createMarketingRepository,createMessagingPolicyRepository,createAiMemoryRepository,createAiSettingsRepository,createAiUsageRepository,createCustomerCrmRepository,createCustomerControlRepository,createCustomerRepository,createTreatmentRepository,createTreatmentSharingRepository, createPool, createServiceOptionRepository,createServiceRepository, createStaffRepository, createStaffScheduleRepository, createResourceRepository, createAvailabilityRepository, createBookingPolicyRepository,createBookingRepository, createCalendarControlRepository,createCalendarRepository, createDashboardRepository,createLocationRepository,createWhatsAppInstanceRepository,createWhatsAppProviderEventRepository,createInboxRepository,createWhatsAppBookingFlowRepository,createWhatsAppBookingManagementRepository, probeDatabase } from '@wsadmin-business/database';
 import { registerAiMemoryRoutes } from './ai-memory-routes.js';
 import { registerAutomationRoutes } from './automation-routes.js';
 import { registerPaymentRoutes } from './payment-routes.js';
 import { registerAdvancedBookingRoutes } from './advanced-booking-routes.js';
+import { registerPropertyRoutes } from './property-routes.js';
 import { createPaymentGatewayRegistryFromEnv } from '@wsadmin-business/payments';
 import { LifecycleAutomationService } from '@wsadmin-business/automation';
 import { registerAutomationLifecycleRoutes } from './automation-lifecycle-routes.js';
@@ -55,6 +56,7 @@ export function buildApp(options:{enableDevRbacProbe?:boolean;customerRepository
   registerMarketingRoutes(app,createMarketingRepository(pool),automationRepository,process.env.WSADMIN_PUBLIC_BASE_URL??'http://192.168.0.102:15280');
   const messagingPolicyRepository=createMessagingPolicyRepository(pool);
   registerMessagingPolicyRoutes(app,messagingPolicyRepository);
+  registerPaymentRoutes(app,createPaymentRepository(pool),createPaymentGatewayRegistryFromEnv());
   const aiKnowledgeRepository=createAiKnowledgeRepository(pool);
   registerAiKnowledgeRoutes(app,aiKnowledgeRepository);
   registerCustomerRoutes(app,options.customerRepository??createCustomerRepository(pool));
@@ -81,9 +83,11 @@ export function buildApp(options:{enableDevRbacProbe?:boolean;customerRepository
   let webhookSecret=process.env.EVOLUTION_WEBHOOK_TOKEN;const webhookFile=process.env.EVOLUTION_WEBHOOK_TOKEN_FILE;if(!webhookSecret&&webhookFile){try{webhookSecret=readFileSync(webhookFile,'utf8').trim();}catch{webhookSecret=undefined;}}
   const inboxRepository=options.inboxRepository??createInboxRepository(pool);
   const bookingDomainService=new BookingService(availabilityRepository,bookingRepository);
+  registerAdvancedBookingRoutes(app,createAdvancedBookingRepository(pool),bookingDomainService);
   const bookingFlow=new WhatsAppBookingFlowService(createWhatsAppBookingFlowRepository(pool),{findSlots:(input)=>findAvailabilitySlots(availabilityRepository,input),createBooking:async(input)=>{const row=await bookingDomainService.create(input);if(row.status==='CONFIRMED'&&lifecycleHooks)await lifecycleHooks.planConfirmed(row.tenantId,row.id);return row;}});
   const bookingManagement=new WhatsAppBookingManagementService(createWhatsAppBookingManagementRepository(pool),{findSlots:(input)=>findAvailabilitySlots(availabilityRepository,input),reschedule:(input)=>bookingDomainService.reschedule(input),cancel:(tenantId,bookingId,actorUserId,reason)=>bookingDomainService.cancel(tenantId,bookingId,actorUserId,reason)});
   const aiRouter=new AiRouter(createAiSettingsRepository(pool),createAiUsageRepository(pool),createAiProviderRegistryFromEnv());
+  registerPropertyRoutes(app,createPropertyRepository(pool),aiRouter);
   const faqService=new GroundedFaqService(aiRouter,aiKnowledgeRepository);
   const aiMemory=new AiMemoryService(aiRouter,createAiMemoryRepository(pool));
   registerAiMemoryRoutes(app,aiMemory);

@@ -30,7 +30,8 @@
     "@wsadmin-business/treatments": "*",
     "@wsadmin-business/automation": "*",
     "@wsadmin-business/payments": "*",
-    "@wsadmin-business/advanced-booking": "*"
+    "@wsadmin-business/advanced-booking": "*",
+    "@wsadmin-business/verticals": "*"
   },
   "devDependencies": {
     "@types/node": "^26.4.0",

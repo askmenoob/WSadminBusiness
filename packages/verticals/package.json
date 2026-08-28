@@ -1,0 +1,1 @@
+{"name":"@wsadmin-business/verticals","private":true,"type":"module","exports":"./src/index.ts","scripts":{"typecheck":"tsc --noEmit","test":"tsx --test src/*.test.ts"},"dependencies":{"@wsadmin-business/ai":"*"},"devDependencies":{"tsx":"^4.20.0","typescript":"^5.9.0"}}
