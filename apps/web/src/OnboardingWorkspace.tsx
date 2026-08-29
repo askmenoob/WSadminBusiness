@@ -188,7 +188,7 @@ export function OnboardingWorkspace({ onNavigate, onBusinessTypeChange, ownerEma
     setSaving(true); setError(null);
     try {
       const next = await tenantPut<OnboardingState>(`/onboarding/${step}`, payloadFor(step)); setState(next); setNotice(`${steps.find(row => row.key === step)?.label} saved`);
-      if (step === 'BUSINESS_TYPE' && businessType) onBusinessTypeChange?.(businessType);
+      if ((step === 'BUSINESS_TYPE' || step === 'OFFERING_DETAILS') && businessType) onBusinessTypeChange?.(businessType);
       if (step === 'OFFERINGS') prepareOfferingDetails();
       const index = steps.findIndex(row => row.key === step); setActiveStep(steps[index + 1]?.key ?? 'COMPLETE');
     } catch (caught) { setError(message(caught, 'Unable to save onboarding checkpoint')); } finally { setSaving(false); }

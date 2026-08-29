@@ -38,6 +38,7 @@ const checks = [
   ['Setup wizard collects tenant-owned company details', onboarding.includes('Company or business name *') && onboarding.includes('Registration number') && onboarding.includes('Company email *') && onboarding.includes('Contact phone *')],
   ['Setup wizard is driven by the shared Business Type registry', onboarding.includes('BUSINESS_TYPE_KEYS') && onboarding.includes('getBusinessTypeDefinition')],
   ['Onboarding refresh callback remains stable', app.includes('onBusinessTypeChange={refreshBusinessContext}') && !app.includes('onBusinessTypeChange={()=>void refreshBusinessContext()}')],
+  ['Offering save refreshes the tenant catalogue', onboarding.includes("step === 'BUSINESS_TYPE' || step === 'OFFERING_DETAILS'") && onboarding.includes('onBusinessTypeChange?.(businessType)')],
   ['Property setup never reuses salon fields', onboarding.includes('Property ID *') && onboarding.includes('Public holiday price (MYR)') && onboarding.includes('Booking rules *')],
   ['Industry setup renders registry-specific fields', onboarding.includes('CustomOfferingInput') && verticals.includes("key: 'vehicleInformation'") && verticals.includes("key: 'variants'") && verticals.includes("key: 'classSchedule'")],
   ['Property setup covers stay pricing and policy', onboarding.includes('Peak season price (MYR)') && onboarding.includes('Minimum nights') && onboarding.includes('Cancellation policy *')],
