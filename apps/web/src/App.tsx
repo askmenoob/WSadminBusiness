@@ -110,7 +110,7 @@ function LoginScreen({configured,trialDays}:{configured:boolean;trialDays:number
           <li><span>02</span><div><strong>Configure what you offer</strong><small>Add services, products, properties, pricing and availability.</small></div></li>
           <li><span>03</span><div><strong>Put WhatsApp AI to work</strong><small>Give customers accurate answers based on your setup.</small></div></li>
         </ol>
-        <p className="login-story-foot">Built for service businesses in Malaysia</p>
+        <p className="login-story-foot">Built for businesses in Malaysia</p>
       </section>
       <section className="auth-card login-card">
         <div className="login-card-brand"><div className="brand-mark">WS</div><strong>WSadmin Business</strong></div>
@@ -119,7 +119,7 @@ function LoginScreen({configured,trialDays}:{configured:boolean;trialDays:number
         <p className="muted">Sign in with Google to create your secure tenant workspace. No payment or card is required to start.</p>
         {state&&state!=='success'?<div className="auth-notice" role="alert">Google sign-in was not completed. Please try again.</div>:null}
         <a className={`google-login ${configured?'':'disabled'}`} href={configured?'/api/v1/auth/google/start':undefined} aria-disabled={!configured}><GoogleLogo/><span>Continue with Google</span></a>
-        <div className="login-assurance" aria-label="Trial assurances"><span>10-day access</span><span>No card required</span><span>Secure Google sign-in</span></div>
+        <div className="login-assurance" aria-label="Trial assurances"><span>{trialDays}-day access</span><span>No card required</span><span>Secure Google sign-in</span></div>
         {!configured?<small>Google login is awaiting server credentials.</small>:<small>WSadmin never receives or stores your Google password.</small>}
       </section>
     </div>
