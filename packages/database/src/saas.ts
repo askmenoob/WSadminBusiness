@@ -28,11 +28,11 @@ async function projectBusinessProfile(client: PoolClient, tenantId: string, payl
 
 async function projectBusinessType(client: PoolClient, tenantId: string, payload: any) {
   const definition = getBusinessTypeDefinition(payload.businessType);
-  await client.query(`UPDATE businesses SET vertical=$2,business_type=$2,offering_kind=$3,workflow_kind=$4,setup_config=setup_config||jsonb_build_object('businessType',$2),updated_at=now() WHERE id=(SELECT id FROM businesses WHERE tenant_id=$1 ORDER BY created_at,id LIMIT 1)`, [tenantId, definition.key, definition.offeringKind, definition.defaultWorkflow]);
+  await client.query(`UPDATE businesses SET vertical=$2::text,business_type=$2::text,offering_kind=$3,workflow_kind=$4,setup_config=setup_config||jsonb_build_object('businessType',$2::text),updated_at=now() WHERE id=(SELECT id FROM businesses WHERE tenant_id=$1 ORDER BY created_at,id LIMIT 1)`, [tenantId, definition.key, definition.offeringKind, definition.defaultWorkflow]);
 }
 
 async function projectBusinessSubtype(client: PoolClient, tenantId: string, payload: any) {
-  await client.query(`UPDATE businesses SET business_type=$2,business_subtype=$3,setup_config=setup_config||jsonb_build_object('businessSubtype',$3),updated_at=now() WHERE id=(SELECT id FROM businesses WHERE tenant_id=$1 ORDER BY created_at,id LIMIT 1)`, [tenantId, payload.businessType, payload.businessSubtype]);
+  await client.query(`UPDATE businesses SET business_type=$2::text,business_subtype=$3::text,setup_config=setup_config||jsonb_build_object('businessSubtype',$3::text),updated_at=now() WHERE id=(SELECT id FROM businesses WHERE tenant_id=$1 ORDER BY created_at,id LIMIT 1)`, [tenantId, payload.businessType, payload.businessSubtype]);
 }
 
 async function upsertService(client: PoolClient, tenantId: string, item: any, existingSourceId: string | null) {
@@ -105,7 +105,7 @@ async function projectWorkflow(client: PoolClient, tenantId: string, payload: an
 }
 
 async function projectConfig(client: PoolClient, tenantId: string, key: 'selectedOffers' | 'payment' | 'whatsappAi', payload: any) {
-  await client.query(`UPDATE businesses SET setup_config=setup_config||jsonb_build_object($2,$3::jsonb),updated_at=now() WHERE id=(SELECT id FROM businesses WHERE tenant_id=$1 ORDER BY created_at,id LIMIT 1)`, [tenantId, key, JSON.stringify(payload)]);
+  await client.query(`UPDATE businesses SET setup_config=setup_config||jsonb_build_object($2::text,$3::jsonb),updated_at=now() WHERE id=(SELECT id FROM businesses WHERE tenant_id=$1 ORDER BY created_at,id LIMIT 1)`, [tenantId, key, JSON.stringify(payload)]);
 }
 
 async function projectOnboarding(client: PoolClient, tenantId: string, step: string, payload: any) {
