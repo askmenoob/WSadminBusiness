@@ -20,7 +20,25 @@ services:
   api:
     build: {context: ., dockerfile: Dockerfile.dev}
     command: ["npm", "run", "dev:api"]
-    environment: {HOST: "0.0.0.0", PORT: "15280", DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}", REDIS_URL: "redis://redis:6379/0"}
+    environment:
+      HOST: "0.0.0.0"
+      PORT: "15280"
+      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}"
+      REDIS_URL: "redis://redis:6379/0"
+      WSADMIN_AUTH_MODE: "${WSADMIN_AUTH_MODE:-UAT}"
+      WSADMIN_APP_URL: "${WSADMIN_APP_URL:-https://wsadmin-biz.imai.my}"
+      AUTH_SESSION_TTL_DAYS: "${AUTH_SESSION_TTL_DAYS:-30}"
+      GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
+      GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
+      GOOGLE_CLIENT_SECRET_FILE: "${GOOGLE_CLIENT_SECRET_FILE:-}"
+      GOOGLE_REDIRECT_URI: "${GOOGLE_REDIRECT_URI:-https://wsadmin-biz.imai.my/api/v1/auth/google/callback}"
+      HITPAY_MODE: "${HITPAY_MODE:-DISABLED}"
+      HITPAY_API_KEY: "${HITPAY_API_KEY:-}"
+      HITPAY_API_KEY_FILE: "${HITPAY_API_KEY_FILE:-}"
+      HITPAY_WEBHOOK_SALT: "${HITPAY_WEBHOOK_SALT:-}"
+      HITPAY_WEBHOOK_SALT_FILE: "${HITPAY_WEBHOOK_SALT_FILE:-}"
+      HITPAY_BASE_URL: "${HITPAY_BASE_URL:-https://api.sandbox.hit-pay.com}"
+      HITPAY_RECURRING_METHODS: "${HITPAY_RECURRING_METHODS:-card}"
     ports: ["127.0.0.1:15280:15280"]
     depends_on: {db: {condition: service_healthy}, redis: {condition: service_healthy}}
     networks: [business]
@@ -34,7 +52,7 @@ services:
   web:
     build: {context: ., dockerfile: Dockerfile.dev}
     command: ["npm", "run", "dev:web"]
-    environment: {VITE_UAT_TENANT_ID: "${VITE_UAT_TENANT_ID:-}"}
+    environment: {VITE_UAT_TENANT_ID: "${VITE_UAT_TENANT_ID:-}", VITE_UAT_ROLE: "${VITE_UAT_ROLE:-TENANT_OWNER}"}
     ports: ["192.168.0.102:15281:15281"]
     networks: [business]
 volumes:

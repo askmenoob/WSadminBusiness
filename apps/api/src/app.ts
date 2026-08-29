@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { Redis } from 'ioredis';
 import { CAPABILITIES, ROLES, AccessDeniedError, authorize, type Actor, type Capability, type Role } from '@wsadmin-business/auth';
 import { AiBookingOrchestrator,AiIntentInterpreter,AiMemoryService,AiMultimodalIntakeService,AiRouter,GroundedFaqService,createTranscriptionProviderFromEnv,createAiProviderRegistryFromEnv } from '@wsadmin-business/ai';
-import { createAiBusinessTools,createAiKnowledgeRepository,createAutomationRepository,createPaymentRepository,createAdvancedBookingRepository,createPropertyRepository,createSaasRepository,createPrivacyRepository,createLifecycleRepository,createMarketingRepository,createMessagingPolicyRepository,createAiMemoryRepository,createAiSettingsRepository,createAiUsageRepository,createCustomerCrmRepository,createCustomerControlRepository,createCustomerRepository,createTreatmentRepository,createTreatmentSharingRepository, createPool, createServiceOptionRepository,createServiceRepository, createStaffRepository, createStaffScheduleRepository, createResourceRepository, createAvailabilityRepository, createBookingPolicyRepository,createBookingRepository, createCalendarControlRepository,createCalendarRepository, createDashboardRepository,createLocationRepository,createWhatsAppInstanceRepository,createWhatsAppProviderEventRepository,createInboxRepository,createWhatsAppBookingFlowRepository,createWhatsAppBookingManagementRepository, probeDatabase } from '@wsadmin-business/database';
+import { createAiBusinessTools,createAiKnowledgeRepository,createAutomationRepository,createPaymentRepository,createAdvancedBookingRepository,createPropertyRepository,createSaasRepository,createSaasBillingRepository,createAuthenticationRepository,createPrivacyRepository,createLifecycleRepository,createMarketingRepository,createMessagingPolicyRepository,createAiMemoryRepository,createAiSettingsRepository,createAiUsageRepository,createCustomerCrmRepository,createCustomerControlRepository,createCustomerRepository,createTreatmentRepository,createTreatmentSharingRepository, createPool, createServiceOptionRepository,createServiceRepository, createStaffRepository, createStaffScheduleRepository, createResourceRepository, createAvailabilityRepository, createBookingPolicyRepository,createBookingRepository, createCalendarControlRepository,createCalendarRepository, createDashboardRepository,createLocationRepository,createWhatsAppInstanceRepository,createWhatsAppProviderEventRepository,createInboxRepository,createWhatsAppBookingFlowRepository,createWhatsAppBookingManagementRepository, probeDatabase } from '@wsadmin-business/database';
 import { registerAiMemoryRoutes } from './ai-memory-routes.js';
 import { registerAutomationRoutes } from './automation-routes.js';
 import { registerPaymentRoutes } from './payment-routes.js';
@@ -44,11 +44,16 @@ import { readFileSync } from 'node:fs';
 import { findAvailabilitySlots } from '@wsadmin-business/availability';
 import { BookingService } from '@wsadmin-business/booking';
 import { WhatsAppBookingFlowService,WhatsAppBookingManagementService } from '@wsadmin-business/whatsapp-booking';
+import { registerAuthentication } from './auth-routes.js';
+import { registerSaasBillingRoutes } from './saas-billing-routes.js';
 export function buildApp(options:{enableDevRbacProbe?:boolean;customerRepository?:import('@wsadmin-business/customers').CustomerRepository;serviceRepository?:import('@wsadmin-business/services').ServiceRepository;staffRepository?:import('@wsadmin-business/staff').StaffRepository;staffScheduleRepository?:import('@wsadmin-business/staff').StaffScheduleRepository;resourceRepository?:import('@wsadmin-business/resources').ResourceRepository;availabilityRepository?:import('@wsadmin-business/availability').AvailabilityRepository;bookingRepository?:import('@wsadmin-business/booking').BookingRepository;calendarRepository?:import('@wsadmin-business/calendar').CalendarRepository;dashboardRepository?:import('@wsadmin-business/dashboard').DashboardRepository;inboxRepository?:import('@wsadmin-business/inbox').InboxRepository;whatsappInstanceRepository?:import('@wsadmin-business/whatsapp').WhatsAppInstanceRepository;whatsappConnectionProvider?:import('@wsadmin-business/whatsapp').WhatsAppConnectionProvider}={}) {
   const app = Fastify({ logger: false });
+  app.removeContentTypeParser('application/json');
+  app.addContentTypeParser('application/json',{parseAs:'buffer'},(request,body,done)=>{const raw=Buffer.isBuffer(body)?body:Buffer.from(body);(request as any).wsadminRawBody=raw;try{done(null,raw.length?JSON.parse(raw.toString('utf8')):{});}catch{const error:any=new SyntaxError('Invalid JSON body');error.statusCode=400;done(error,undefined);}});
+  const pool = createPool();
+  registerAuthentication(app,createAuthenticationRepository(pool));
   app.addHook('onRequest',async(request,reply)=>{const requestId=String(request.headers['x-request-id']??randomUUID());(request as any).wsadminRequestId=requestId;reply.header('x-request-id',requestId);});
   app.addHook('onResponse',async(request,reply)=>{const tenantId=String(request.headers['x-wsadmin-tenant-id']??'');console.log(JSON.stringify({event:'http_request',requestId:(request as any).wsadminRequestId,tenantId:tenantId||null,method:request.method,url:request.url,statusCode:reply.statusCode,elapsedMs:Math.round(reply.elapsedTime)}));});
-  const pool = createPool();
   const redis = new Redis(process.env.REDIS_URL ?? 'redis://127.0.0.1:56379/0',{lazyConnect:true,maxRetriesPerRequest:2});
   async function probeRedis(){if(redis.status==='wait')await redis.connect();const pong=await redis.ping();return {status:pong==='PONG'?'ok':'error',namespace:'wsb:'};}
   app.get('/health',async(_request,reply)=>{try{const[database,cache]=await Promise.all([probeDatabase(pool),probeRedis()]);return{service:'wsadmin-business-api',status:'ok',product:'WSadmin Business',isolation:'mvoc-separate',database,cache,timezone:'Asia/Kuala_Lumpur'};}catch(error){reply.code(503);return{service:'wsadmin-business-api',status:'error',error:error instanceof Error?error.message:'health probe failed'};}});
@@ -63,6 +68,7 @@ export function buildApp(options:{enableDevRbacProbe?:boolean;customerRepository
   const messagingPolicyRepository=createMessagingPolicyRepository(pool);
   registerMessagingPolicyRoutes(app,messagingPolicyRepository);
   registerSaasRoutes(app,createSaasRepository(pool));
+  registerSaasBillingRoutes(app,createSaasBillingRepository(pool));
   registerPrivacyRoutes(app,createPrivacyRepository(pool));
   const paymentRepository=createPaymentRepository(pool);
   const paymentGatewayRegistry=createPaymentGatewayRegistryFromEnv();

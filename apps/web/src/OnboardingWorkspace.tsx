@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  authenticationMode,
   platformGet,
   tenantGet,
+  tenantPost,
   tenantPut,
+  type BillingCheckout,
+  type BillingOverview,
   type CatalogService,
   type IntegrationStatus,
   type OnboardingState,
@@ -32,6 +36,7 @@ const message = (error: unknown, fallback: string) => error instanceof Error ? e
 export function OnboardingWorkspace({ onNavigate }: { onNavigate: (module: string) => void }) {
   const [state, setState] = useState<OnboardingState | null>(null);
   const [overview, setOverview] = useState<TenantPlanOverview | null>(null);
+  const [billing, setBilling] = useState<BillingOverview | null>(null);
   const [plans, setPlans] = useState<SaaSPlan[]>([]);
   const [integrations, setIntegrations] = useState<IntegrationStatus | null>(null);
   const [readiness, setReadiness] = useState<OperationalReadiness>({ services: 0, staff: 0, hours: 0 });
@@ -43,13 +48,15 @@ export function OnboardingWorkspace({ onNavigate }: { onNavigate: (module: strin
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [checkoutPlan, setCheckoutPlan] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const [nextState, nextOverview, nextPlans, nextIntegrations, services, staff] = await Promise.all([
+      const [nextState, nextOverview, nextBilling, nextPlans, nextIntegrations, services, staff] = await Promise.all([
         tenantGet<OnboardingState>('/onboarding'),
         tenantGet<TenantPlanOverview>('/subscription'),
+        tenantGet<BillingOverview>('/billing'),
         platformGet<SaaSPlan[]>('/plans'),
         tenantGet<IntegrationStatus>('/settings/integrations'),
         tenantGet<CatalogService[]>('/services?active=true&limit=100'),
@@ -62,7 +69,7 @@ export function OnboardingWorkspace({ onNavigate }: { onNavigate: (module: strin
       setBusinessName(typeof profile.businessName === 'string' ? profile.businessName : '');
       setTimezone(typeof profile.timezone === 'string' ? profile.timezone : 'Asia/Kuala_Lumpur');
       setVertical(typeof savedVertical.vertical === 'string' ? savedVertical.vertical : 'APPOINTMENT');
-      setState(nextState); setOverview(nextOverview); setPlans(nextPlans); setIntegrations(nextIntegrations);
+      setState(nextState); setOverview(nextOverview); setBilling(nextBilling); setPlans(nextPlans); setIntegrations(nextIntegrations);
       setReadiness({ services: services.filter(row => row.active).length, staff: staff.filter(row => row.active).length, hours: hourRows.filter(row => row.intervals.length > 0).length });
       const nextMissing = steps.find(step => !(step.key in data));
       setActiveStep(nextState.completed ? 'COMPLETE' : nextMissing?.key ?? 'COMPLETE');
@@ -124,6 +131,12 @@ export function OnboardingWorkspace({ onNavigate }: { onNavigate: (module: strin
     }
   }
 
+  async function startCheckout(planCode:string){
+    setCheckoutPlan(planCode);setError(null);
+    try{const checkout=await tenantPost<BillingCheckout>('/billing/checkout',{planCode});setBilling(current=>({checkout,invoices:current?.invoices??[]}));if(!checkout.checkoutUrl)throw new Error('HitPay did not return a checkout URL');window.location.assign(checkout.checkoutUrl);}
+    catch(caught){setError(message(caught,'Unable to start HitPay checkout'));setCheckoutPlan(null);}
+  }
+
   const currentPlan = overview?.plan;
   const completionReady = savedCount === steps.length;
 
@@ -144,9 +157,18 @@ export function OnboardingWorkspace({ onNavigate }: { onNavigate: (module: strin
         {activeStep === 'HOURS' ? <ReadinessStep eyebrow="Step 6" title="Working hours" ready={readiness.hours > 0} summary={`${readiness.hours} staff schedule${readiness.hours === 1 ? '' : 's'} configured`} action="Manage working hours" onAction={() => onNavigate('Staff')}><button className="primary-button" disabled={saving || !canSave('HOURS')} onClick={() => void saveStep('HOURS')}>Confirm & review</button></ReadinessStep> : null}
         {activeStep === 'COMPLETE' ? <section className="onboarding-review"><span className={state?.completed ? 'review-icon complete' : 'review-icon'}>{state?.completed ? '✓' : '6'}</span><p className="eyebrow">Review</p><h2>{state?.completed ? 'Tenant onboarding is complete' : completionReady ? 'Ready to activate' : 'Checkpoints remain'}</h2><p className="muted">{state?.completed ? 'All onboarding checkpoints are stored and the tenant is ready for operational UAT.' : completionReady ? 'All required checkpoints are recorded. Complete onboarding to lock the current activation state.' : `${steps.length - savedCount} checkpoint${steps.length - savedCount === 1 ? '' : 's'} must still be saved.`}</p>{!state?.completed ? <button className="primary-button" disabled={saving || !completionReady} onClick={() => void complete()}>{saving ? 'Completing…' : 'Complete onboarding'}</button> : null}</section> : null}
       </main>
-      <aside className="workspace-card plan-panel"><div className="section-head"><div><p className="eyebrow">Plan & usage</p><h2>{currentPlan?.name ?? 'No active plan'}</h2></div>{overview?.subscription ? <span className={`settings-status ${['ACTIVE', 'TRIAL'].includes(overview.subscription.status) ? 'configured' : ''}`}>{overview.subscription.status}</span> : null}</div>{currentPlan ? <><strong className="plan-price">{money(currentPlan.monthlyPriceMinor, currentPlan.currency)}<small>/ month</small></strong><p className="muted">Usage period {overview?.periodKey}</p><div className="quota-list">{overview?.quotas.map(row => <div key={row.key}><div><strong>{label(row.key)}</strong><span>{row.kind === 'QUOTA' ? `${row.used ?? 0} / ${row.limit ?? 0}` : row.enabled ? 'Included' : 'Unavailable'}</span></div>{row.kind === 'QUOTA' ? <div className="quota-track"><i style={{ width: `${Math.min(100, ((row.used ?? 0) / Math.max(1, row.limit ?? 1)) * 100)}%` }} /></div> : <span className={row.enabled ? 'feature-state enabled' : 'feature-state'}>{row.enabled ? 'Enabled' : 'Disabled'}</span>}</div>)}</div></> : <div className="available-plans"><p className="muted">Available plans</p>{plans.map(plan => <div key={plan.id}><strong>{plan.name}</strong><span>{money(plan.monthlyPriceMinor, plan.currency)}</span></div>)}</div>}</aside>
+      <PlanPanel overview={overview} billing={billing} plans={plans} currentPlan={currentPlan} checkoutPlan={checkoutPlan} onCheckout={startCheckout}/>
     </div>
   </>;
+}
+
+function PlanPanel({overview,billing,plans,currentPlan,checkoutPlan,onCheckout}:{overview:TenantPlanOverview|null;billing:BillingOverview|null;plans:SaaSPlan[];currentPlan:SaaSPlan|null|undefined;checkoutPlan:string|null;onCheckout:(planCode:string)=>Promise<void>}){
+  const pending=billing?.checkout&&['PENDING','ACTION_REQUIRED'].includes(billing.checkout.status)?billing.checkout:null;
+  return <aside className="workspace-card plan-panel">
+    <div className="section-head"><div><p className="eyebrow">Plan & billing</p><h2>{currentPlan?.name??'Choose a plan'}</h2></div>{overview?.subscription?<span className={`settings-status ${['ACTIVE','TRIAL'].includes(overview.subscription.status)?'configured':''}`}>{overview.subscription.status}</span>:pending?<span className="settings-status">{pending.status.replaceAll('_',' ')}</span>:null}</div>
+    {pending?<div className="billing-pending"><strong>HitPay confirmation pending</strong><span>WSadmin will activate this plan only after a verified payment webhook.</span>{pending.checkoutUrl?<a href={pending.checkoutUrl}>Continue checkout</a>:null}</div>:null}
+    {currentPlan?<><strong className="plan-price">{money(currentPlan.monthlyPriceMinor,currentPlan.currency)}<small>/ month</small></strong><p className="muted">Usage period {overview?.periodKey}</p><div className="quota-list">{overview?.quotas.map(row=><div key={row.key}><div><strong>{label(row.key)}</strong><span>{row.kind==='QUOTA'?`${row.used??0} / ${row.limit??0}`:row.enabled?'Included':'Unavailable'}</span></div>{row.kind==='QUOTA'?<div className="quota-track"><i style={{width:`${Math.min(100,((row.used??0)/Math.max(1,row.limit??1))*100)}%`}}/></div>:<span className={row.enabled?'feature-state enabled':'feature-state'}>{row.enabled?'Enabled':'Disabled'}</span>}</div>)}</div></>:<div className="available-plans"><p className="muted">Monthly subscription paid securely through HitPay.</p>{plans.filter(plan=>plan.monthlyPriceMinor>0).map(plan=><div className="billing-plan" key={plan.id}><div><strong>{plan.name}</strong><span>{money(plan.monthlyPriceMinor,plan.currency)} / month</span></div><button className="primary-button" disabled={Boolean(checkoutPlan)||Boolean(pending)||authenticationMode()!=='GOOGLE'} onClick={()=>void onCheckout(plan.code)}>{pending?'Checkout pending':checkoutPlan===plan.code?'Opening…':'Subscribe'}</button></div>)}{!plans.some(plan=>plan.monthlyPriceMinor>0)?<small className="billing-help">No paid plan has been published yet. The System Owner must approve pricing before checkout can open.</small>:authenticationMode()!=='GOOGLE'?<small className="billing-help">Paid checkout becomes available after secure Google tenant login is enabled.</small>:null}</div>}
+  </aside>;
 }
 
 function ReadinessStep({ eyebrow, title, ready, summary, action, onAction, children }: { eyebrow: string; title: string; ready: boolean; summary: string; action: string; onAction: () => void; children: React.ReactNode }) {

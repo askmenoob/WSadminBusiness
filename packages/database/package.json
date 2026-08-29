@@ -30,7 +30,8 @@
     "@wsadmin-business/advanced-booking": "*",
     "@wsadmin-business/verticals": "*",
     "@wsadmin-business/saas": "*",
-    "@wsadmin-business/privacy": "*"
+    "@wsadmin-business/privacy": "*",
+    "@wsadmin-business/auth": "*"
   },
   "devDependencies": {
     "@types/node": "^26.4.0",

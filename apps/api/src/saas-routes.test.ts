@@ -46,3 +46,11 @@ test('system dashboard is visible only to System Owner', async () => {
   assert.equal(response.statusCode, 403);
   await app.close();
 });
+
+test('tenant owner cannot activate its own subscription',async()=>{
+  const app=Fastify();registerSaasRoutes(app,repo);
+  const response=await app.inject({method:'PUT',url:'/api/v1/tenants/tenant-a/subscription',headers:tenantHeaders(),payload:{planCode:'GROWTH',status:'ACTIVE'}});
+  assert.equal(response.statusCode,403);
+  assert.equal(response.json().error,'provider_or_system_owner_required');
+  await app.close();
+});
