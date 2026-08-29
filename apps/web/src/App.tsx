@@ -82,7 +82,7 @@ export function App(){
             :setup?<BusinessSetupWorkspace initialTab={active as 'Staff'|'Services'|'Resources'|'Locations'}/>
             :revenue?<RevenueAutomationWorkspace module={active as RevenueTab}/>
             :active==='Reports'?<ReportsWorkspace/>
-            :active==='Onboarding'?<OnboardingWorkspace onNavigate={open} onBusinessTypeChange={()=>void refreshBusinessContext()} ownerEmail={identity?.email} trialDays={auth.config?.trialDays??10}/>
+            :active==='Onboarding'?<OnboardingWorkspace onNavigate={open} onBusinessTypeChange={refreshBusinessContext} ownerEmail={identity?.email} trialDays={auth.config?.trialDays??10}/>
             :active==='Settings'?<SettingsWorkspace/>
             :active==='System Owner'?<SystemOwnerWorkspace/>
             :null}
