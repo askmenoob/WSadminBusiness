@@ -31,6 +31,7 @@
     "test:property-vertical:db": "tsx scripts/property-vertical-acceptance.ts",
     "test:saas:db": "tsx scripts/saas-acceptance.ts",
     "test:tenant-auth-billing:db": "tsx scripts/tenant-auth-billing-acceptance.ts",
+    "test:dynamic-onboarding:db": "tsx scripts/dynamic-onboarding-acceptance.ts",
     "test:security-privacy:db": "tsx scripts/security-privacy-acceptance.ts",
     "test:performance:db": "tsx scripts/performance-acceptance.ts",
     "test:e2e-technical:db": "tsx scripts/e2e-technical-uat.ts",

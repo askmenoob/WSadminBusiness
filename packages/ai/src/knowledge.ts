@@ -1,7 +1,7 @@
 import type { AiRouter } from './router.js';
 
-export type KnowledgeSourceType = 'FAQ' | 'SERVICE' | 'STAFF' | 'RESOURCE' | 'LOCATION' | 'BOOKING_POLICY';
-export type KnowledgeTopic = 'PRICE' | 'SERVICE' | 'LOCATION' | 'STAFF' | 'RESOURCE' | 'HOURS' | 'POLICY';
+export type KnowledgeSourceType = 'BUSINESS_CONTEXT' | 'OFFERING' | 'FAQ' | 'SERVICE' | 'STAFF' | 'RESOURCE' | 'LOCATION' | 'BOOKING_POLICY';
+export type KnowledgeTopic = 'PRICE' | 'SERVICE' | 'PROPERTY' | 'PRODUCT' | 'CAPACITY' | 'AVAILABILITY' | 'PAYMENT' | 'LOCATION' | 'STAFF' | 'RESOURCE' | 'HOURS' | 'POLICY';
 export type KnowledgeSource = { id: string; type: KnowledgeSourceType; title: string; content: string };
 export type KnowledgeQuery = { normalized: string; terms: string[]; topics: KnowledgeTopic[] };
 export type FaqEntry = { id: string; tenantId: string; question: string; answer: string; active: boolean; sortOrder: number; createdAt: Date; updatedAt: Date };
@@ -41,6 +41,11 @@ const stopWords = new Set([
 const topicTerms: Record<KnowledgeTopic, Set<string>> = {
   PRICE: new Set(['harga', 'price', 'cost', 'fee', 'bayaran', 'rm', 'mahal', 'murah', 'berapa']),
   SERVICE: new Set(['servis', 'service', 'services', 'rawatan', 'treatment', 'treatments', 'pakej', 'package']),
+  PROPERTY: new Set(['property', 'homestay', 'villa', 'apartment', 'condominium', 'chalet', 'resort', 'hotel', 'unit', 'room', 'bilik', 'penginapan']),
+  PRODUCT: new Set(['produk', 'product', 'menu', 'item', 'barang', 'stock', 'stok', 'variant', 'varian']),
+  CAPACITY: new Set(['kapasiti', 'capacity', 'muat', 'pax', 'guest', 'guests', 'tetamu', 'orang']),
+  AVAILABILITY: new Set(['kosong', 'available', 'availability', 'slot', 'tarikh', 'date', 'checkin', 'checkout']),
+  PAYMENT: new Set(['deposit', 'bayar', 'payment', 'cash', 'card', 'kad', 'refund']),
   LOCATION: new Set(['lokasi', 'location', 'cawangan', 'branch', 'alamat', 'address', 'parking', 'parkir']),
   STAFF: new Set(['staff', 'staf', 'therapist', 'terapis', 'doktor', 'doctor', 'pekerja', 'worker']),
   RESOURCE: new Set(['resource', 'bilik', 'room', 'kerusi', 'chair', 'equipment', 'alat', 'vehicle', 'kenderaan']),
@@ -61,6 +66,8 @@ export function buildKnowledgeQuery(value: string): KnowledgeQuery {
 }
 
 const sourceTopics: Record<KnowledgeSourceType, KnowledgeTopic[]> = {
+  BUSINESS_CONTEXT: [],
+  OFFERING: ['PRICE','SERVICE','PROPERTY','PRODUCT','CAPACITY','AVAILABILITY','PAYMENT'],
   FAQ: [],
   SERVICE: ['PRICE', 'SERVICE'],
   STAFF: ['STAFF', 'HOURS'],
@@ -74,7 +81,7 @@ export function rankKnowledgeSources(sources: KnowledgeSource[], query: Knowledg
   for (const source of sources) {
     const title = normalizeKnowledgeQuestion(source.title);
     const content = normalizeKnowledgeQuestion(source.content);
-    let score = sourceTopics[source.type].some(topic => query.topics.includes(topic)) ? 3 : 0;
+    let score = source.type === 'BUSINESS_CONTEXT' ? 1 : sourceTopics[source.type].some(topic => query.topics.includes(topic)) ? 3 : 0;
     for (const term of query.terms) {
       if (title.includes(term)) score += 8;
       if (content.includes(term)) score += 2;

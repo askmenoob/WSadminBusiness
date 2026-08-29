@@ -5,7 +5,7 @@ import { readRuntimeSecret } from './runtime-secrets.js';
 
 const SESSION_COOKIE='wsadmin_session',STATE_COOKIE='wsadmin_oauth_state',VERIFIER_COOKIE='wsadmin_oauth_verifier';
 export type AuthenticationMode='UAT'|'GOOGLE';
-export type AuthenticationConfig={mode:AuthenticationMode;appUrl:string;clientId:string;clientSecret:string;redirectUri:string;secureCookies:boolean;sessionTtlMs:number};
+export type AuthenticationConfig={mode:AuthenticationMode;appUrl:string;clientId:string;clientSecret:string;redirectUri:string;secureCookies:boolean;sessionTtlMs:number;trialDays:number;trialPlanCode:string};
 export interface GoogleOAuthClient{authorizationUrl(input:{state:string;codeChallenge:string}):string;exchangeCode(code:string,codeVerifier:string):Promise<string>;getIdentity(accessToken:string):Promise<GoogleIdentity>;}
 
 const cookies=(request:FastifyRequest)=>Object.fromEntries(String(request.headers.cookie??'').split(';').map(part=>part.trim()).filter(Boolean).map(part=>{const index=part.indexOf('=');return index<0?[part,'']:[part.slice(0,index),decodeURIComponent(part.slice(index+1))];}));
@@ -13,12 +13,16 @@ const cookie=(name:string,value:string,options:{maxAge?:number;secure:boolean;pa
 const safeTextEqual=(a:string,b:string)=>{const aa=Buffer.from(a),bb=Buffer.from(b);return aa.length===bb.length&&timingSafeEqual(aa,bb);};
 const clearActorHeaders=(request:FastifyRequest)=>{for(const name of ['x-wsadmin-role','x-wsadmin-user-id','x-wsadmin-tenant-id','x-wsadmin-user-email'])delete request.headers[name];};
 const isProtected=(url:string)=>{const path=url.split('?')[0]??url;return path.startsWith('/api/v1/tenants/')||path.startsWith('/api/v1/system/');};
+const isTrialRecoveryRoute=(url:string)=>/^\/api\/v1\/tenants\/[^/]+\/(subscription|billing(?:\/.*)?)$/.test(url.split('?')[0]??url);
 
 export function authenticationConfigFromEnv():AuthenticationConfig{
   const raw=String(process.env.WSADMIN_AUTH_MODE??(process.env.NODE_ENV==='production'?'GOOGLE':'UAT')).toUpperCase();
   if(raw!=='UAT'&&raw!=='GOOGLE')throw new Error('WSADMIN_AUTH_MODE must be UAT or GOOGLE');
   const appUrl=String(process.env.WSADMIN_APP_URL??process.env.WSADMIN_PUBLIC_WEB_URL??'https://wsadmin-biz.imai.my').replace(/\/$/,'');
-  return{mode:raw,appUrl,clientId:String(process.env.GOOGLE_CLIENT_ID??'').trim(),clientSecret:readRuntimeSecret('GOOGLE_CLIENT_SECRET','GOOGLE_CLIENT_SECRET_FILE'),redirectUri:String(process.env.GOOGLE_REDIRECT_URI??`${appUrl}/api/v1/auth/google/callback`).trim(),secureCookies:appUrl.startsWith('https://'),sessionTtlMs:Math.max(1,Number(process.env.AUTH_SESSION_TTL_DAYS??30))*24*60*60_000};
+  const trialDays=Number(process.env.WSADMIN_TRIAL_DAYS??10),trialPlanCode=String(process.env.WSADMIN_TRIAL_PLAN_CODE??'TRIAL').trim().toUpperCase();
+  if(!Number.isInteger(trialDays)||trialDays<1||trialDays>90)throw new Error('WSADMIN_TRIAL_DAYS must be an integer from 1 to 90');
+  if(!/^[A-Z0-9_-]{2,40}$/.test(trialPlanCode))throw new Error('WSADMIN_TRIAL_PLAN_CODE is invalid');
+  return{mode:raw,appUrl,clientId:String(process.env.GOOGLE_CLIENT_ID??'').trim(),clientSecret:readRuntimeSecret('GOOGLE_CLIENT_SECRET','GOOGLE_CLIENT_SECRET_FILE'),redirectUri:String(process.env.GOOGLE_REDIRECT_URI??`${appUrl}/api/v1/auth/google/callback`).trim(),secureCookies:appUrl.startsWith('https://'),sessionTtlMs:Math.max(1,Number(process.env.AUTH_SESSION_TTL_DAYS??30))*24*60*60_000,trialDays,trialPlanCode};
 }
 
 export class GoogleOAuthHttpClient implements GoogleOAuthClient{
@@ -29,20 +33,21 @@ export class GoogleOAuthHttpClient implements GoogleOAuthClient{
 }
 
 export function registerAuthentication(app:FastifyInstance,repo:AuthenticationRepository,config:AuthenticationConfig=authenticationConfigFromEnv(),google:GoogleOAuthClient=new GoogleOAuthHttpClient(config)){
-  const service=new AuthenticationService(repo,{sessionTtlMs:config.sessionTtlMs});
+  const service=new AuthenticationService(repo,{sessionTtlMs:config.sessionTtlMs,trialDays:config.trialDays,trialPlanCode:config.trialPlanCode});
   app.addHook('onRequest',async(request,reply)=>{
     if(config.mode!=='GOOGLE')return;
     clearActorHeaders(request);
     if(!isProtected(request.url))return;
     const actor=await service.resolve(cookies(request)[SESSION_COOKIE]??'');
     if(!actor){return reply.code(401).send({error:'authentication_required'});}
+    if(actor.trialExpired&&!isTrialRecoveryRoute(request.url))return reply.code(402).send({error:'trial_expired',trialEndsAt:actor.trialEndsAt?.toISOString()??null});
     (request as any).wsadminAuth=actor;
     request.headers['x-wsadmin-role']=actor.role;
     request.headers['x-wsadmin-user-id']=actor.userId;
     request.headers['x-wsadmin-user-email']=actor.email;
     if(actor.tenantId)request.headers['x-wsadmin-tenant-id']=actor.tenantId;
   });
-  app.get('/api/v1/auth/config',async()=>({mode:config.mode,googleConfigured:Boolean(config.clientId&&config.clientSecret),provider:config.mode==='GOOGLE'?'GOOGLE':null}));
+  app.get('/api/v1/auth/config',async()=>({mode:config.mode,googleConfigured:Boolean(config.clientId&&config.clientSecret),provider:config.mode==='GOOGLE'?'GOOGLE':null,trialDays:config.trialDays}));
   app.get('/api/v1/auth/google/start',async(_request,reply)=>{
     if(config.mode!=='GOOGLE'||!config.clientId||!config.clientSecret)return reply.code(503).send({error:'google_auth_not_configured'});
     const state=randomBytes(32).toString('base64url'),verifier=randomBytes(48).toString('base64url'),challenge=createHash('sha256').update(verifier).digest('base64url');
@@ -56,7 +61,7 @@ export function registerAuthentication(app:FastifyInstance,repo:AuthenticationRe
     if(!query.code||!query.state||!stored[STATE_COOKIE]||!stored[VERIFIER_COOKIE]||!safeTextEqual(query.state,stored[STATE_COOKIE]))return reply.header('set-cookie',clear).code(401).send({error:'invalid_oauth_state'});
     try{const accessToken=await google.exchangeCode(query.code,stored[VERIFIER_COOKIE]);const identity=await google.getIdentity(accessToken);const session=await service.loginWithGoogle(identity);const maxAge=Math.floor((session.expiresAt.getTime()-Date.now())/1000);return reply.header('set-cookie',[...clear,cookie(SESSION_COOKIE,session.token,{secure:config.secureCookies,maxAge})]).redirect(`${config.appUrl}/?auth=success`);}catch{return reply.header('set-cookie',clear).redirect(`${config.appUrl}/?auth=failed`);}
   });
-  app.get('/api/v1/auth/session',async(request,reply)=>{if(config.mode!=='GOOGLE')return{mode:'UAT',authenticated:false};const actor=await service.resolve(cookies(request)[SESSION_COOKIE]??'');if(!actor)return reply.code(401).send({error:'authentication_required'});return{mode:'GOOGLE',authenticated:true,user:{id:actor.userId,email:actor.email,displayName:actor.displayName},tenant:actor.tenantId?{id:actor.tenantId,name:actor.tenantName}:null,role:actor.role,onboardingCompleted:actor.onboardingCompleted};});
+  app.get('/api/v1/auth/session',async(request,reply)=>{if(config.mode!=='GOOGLE')return{mode:'UAT',authenticated:false};const actor=await service.resolve(cookies(request)[SESSION_COOKIE]??'');if(!actor)return reply.code(401).send({error:'authentication_required'});return{mode:'GOOGLE',authenticated:true,user:{id:actor.userId,email:actor.email,displayName:actor.displayName},tenant:actor.tenantId?{id:actor.tenantId,name:actor.tenantName}:null,role:actor.role,onboardingCompleted:actor.onboardingCompleted,subscription:actor.subscriptionStatus?{status:actor.subscriptionStatus,trialEndsAt:actor.trialEndsAt?.toISOString()??null,trialExpired:Boolean(actor.trialExpired)}:null};});
   app.post('/api/v1/auth/logout',async(request,reply)=>{await service.logout(cookies(request)[SESSION_COOKIE]??'');reply.header('set-cookie',cookie(SESSION_COOKIE,'',{secure:config.secureCookies,maxAge:0}));return reply.code(204).send();});
   return{config,service};
 }

@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import type { Pool } from 'pg';
-import { AuthError, type AuthenticatedActor, type AuthenticationRepository, type GoogleIdentity, type Role } from '@wsadmin-business/auth';
+import { AuthError, type AuthenticatedActor, type AuthenticationRepository, type GoogleIdentity, type Role, type TrialProvisioning } from '@wsadmin-business/auth';
 
 const slug=(value:string)=>value.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40)||'business';
 
 export function createAuthenticationRepository(pool:Pool):AuthenticationRepository{return{
-  async provisionGoogleIdentity(identity:GoogleIdentity):Promise<AuthenticatedActor>{
+  async provisionGoogleIdentity(identity:GoogleIdentity,trial:TrialProvisioning):Promise<AuthenticatedActor>{
     const client=await pool.connect();
     try{
       await client.query('BEGIN');
@@ -31,16 +31,18 @@ export function createAuthenticationRepository(pool:Pool):AuthenticationReposito
         await client.query(`INSERT INTO tenant_memberships(tenant_id,user_id,role) VALUES($1,$2,'TENANT_OWNER')`,[tenant.id,user.id]);
         membership={tenant_id:tenant.id,role:'TENANT_OWNER',name:tenant.name,onboarding_completed:false};
       }
+      await client.query(`INSERT INTO tenant_subscriptions(tenant_id,plan_code,status,trial_ends_at) VALUES($1,$2,'TRIAL',$3) ON CONFLICT(tenant_id) DO NOTHING`,[membership.tenant_id,trial.planCode,trial.trialEndsAt]);
+      const subscription=(await client.query(`SELECT status,trial_ends_at,status='TRIAL' AND (trial_ends_at IS NULL OR trial_ends_at<=now()) trial_expired FROM tenant_subscriptions WHERE tenant_id=$1`,[membership.tenant_id])).rows[0];
       await client.query('COMMIT');
-      return{userId:user.id,email:user.email,displayName:user.display_name,role:membership.role as Role,tenantId:membership.tenant_id,tenantName:membership.name,onboardingCompleted:Boolean(membership.onboarding_completed)};
+      return{userId:user.id,email:user.email,displayName:user.display_name,role:membership.role as Role,tenantId:membership.tenant_id,tenantName:membership.name,onboardingCompleted:Boolean(membership.onboarding_completed),subscriptionStatus:subscription?.status??null,trialEndsAt:subscription?.trial_ends_at??null,trialExpired:Boolean(subscription?.trial_expired)};
     }catch(error){await client.query('ROLLBACK');if((error as any)?.code==='23505')throw new AuthError('Google identity or email is already linked','identity_conflict');throw error;}finally{client.release();}
   },
   async createSession(input){await pool.query(`INSERT INTO auth_sessions(user_id,tenant_id,token_hash,expires_at) VALUES($1,$2,$3,$4)`,[input.userId,input.tenantId,input.tokenHash,input.expiresAt]);},
   async resolveSession(tokenHash){
-    const result=await pool.query(`SELECT s.id,u.id user_id,u.email,u.display_name,u.platform_role,s.tenant_id,t.name tenant_name,tm.role tenant_role,coalesce(o.completed,false) onboarding_completed FROM auth_sessions s JOIN users u ON u.id=s.user_id LEFT JOIN tenants t ON t.id=s.tenant_id LEFT JOIN tenant_memberships tm ON tm.user_id=u.id AND tm.tenant_id=s.tenant_id LEFT JOIN tenant_onboarding o ON o.tenant_id=s.tenant_id WHERE s.token_hash=$1 AND s.expires_at>now() AND u.is_active=true AND (u.platform_role='SYSTEM_OWNER' OR (tm.id IS NOT NULL AND t.status='ACTIVE'))`,[tokenHash]);
+    const result=await pool.query(`SELECT session.id,u.id user_id,u.email,u.display_name,u.platform_role,session.tenant_id,t.name tenant_name,tm.role tenant_role,coalesce(o.completed,false) onboarding_completed,sub.status subscription_status,sub.trial_ends_at,coalesce(sub.status='TRIAL' AND (sub.trial_ends_at IS NULL OR sub.trial_ends_at<=now()),false) trial_expired FROM auth_sessions session JOIN users u ON u.id=session.user_id LEFT JOIN tenants t ON t.id=session.tenant_id LEFT JOIN tenant_memberships tm ON tm.user_id=u.id AND tm.tenant_id=session.tenant_id LEFT JOIN tenant_onboarding o ON o.tenant_id=session.tenant_id LEFT JOIN tenant_subscriptions sub ON sub.tenant_id=session.tenant_id WHERE session.token_hash=$1 AND session.expires_at>now() AND u.is_active=true AND (u.platform_role='SYSTEM_OWNER' OR (tm.id IS NOT NULL AND t.status='ACTIVE'))`,[tokenHash]);
     if(!result.rowCount)return null;
     const row=result.rows[0];await pool.query('UPDATE auth_sessions SET last_seen_at=now() WHERE id=$1',[row.id]);
-    return{userId:row.user_id,email:row.email,displayName:row.display_name,role:(row.platform_role==='SYSTEM_OWNER'?'SYSTEM_OWNER':row.tenant_role) as Role,...(row.tenant_id?{tenantId:row.tenant_id,tenantName:row.tenant_name}:{}),onboardingCompleted:row.platform_role==='SYSTEM_OWNER'||Boolean(row.onboarding_completed)};
+    return{userId:row.user_id,email:row.email,displayName:row.display_name,role:(row.platform_role==='SYSTEM_OWNER'?'SYSTEM_OWNER':row.tenant_role) as Role,...(row.tenant_id?{tenantId:row.tenant_id,tenantName:row.tenant_name}:{}),onboardingCompleted:row.platform_role==='SYSTEM_OWNER'||Boolean(row.onboarding_completed),subscriptionStatus:row.subscription_status??null,trialEndsAt:row.trial_ends_at??null,trialExpired:Boolean(row.trial_expired)};
   },
   async deleteSession(tokenHash){await pool.query('DELETE FROM auth_sessions WHERE token_hash=$1',[tokenHash]);},
 };}

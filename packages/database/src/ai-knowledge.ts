@@ -16,6 +16,9 @@ const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frida
 
 function money(value: number, currency: string) { return currency === 'MYR' ? `RM${(value / 100).toFixed(2)}` : `${currency} ${(value / 100).toFixed(2)}`; }
 function time(minutes: number) { return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`; }
+function human(value: unknown) { return String(value ?? '').toLowerCase().replaceAll('_', ' ').replace(/\b\w/g, character => character.toUpperCase()); }
+const commonOfferingAttributes = new Set(['sourceKey','name','description','priceMinor','durationMinutes','capacity','depositMinor','staffNames','stockQuantity','preparationMinutes','active','propertyCode','locationName','googleMapsUrl','roomType','unitCount','roomCount','bedrooms','bathrooms','maxGuests','privatePool','amenities','weekdayPriceMinor','weekendPriceMinor','publicHolidayPriceMinor','peakSeasonPriceMinor','extraGuestChargeMinor','cleaningFeeMinor','minimumNights','maximumNights','sameDayBooking','checkInTime','checkOutTime','earlyCheckInAllowed','lateCheckOutAllowed','availability','bookingRules','cancellationPolicy']);
+function industryDetails(attributes:Record<string,unknown>,currency:string){return Object.entries(attributes).filter(([key,value])=>!commonOfferingAttributes.has(key)&&value!==''&&value!==null&&value!==undefined&&(!Array.isArray(value)||value.length)).map(([key,value])=>`${human(key)}: ${key.toLowerCase().endsWith('minor')&&typeof value==='number'?money(value,currency):Array.isArray(value)?value.join(', '):typeof value==='boolean'?(value?'yes':'no'):String(value)}`).join('; ');}
 function cleanFaqInput(input: { question?: string; answer?: string }) {
   const question = input.question?.trim().slice(0, 500) ?? '';
   const answer = input.answer?.trim().slice(0, 4000) ?? '';
@@ -37,6 +40,31 @@ export function createAiKnowledgeRepository(pool: Pool): AiKnowledgeRepository {
       const take = Math.max(1, Math.min(limit, 20));
       const candidateLimit = Math.max(20, take * 4);
       const sources: KnowledgeSource[] = [];
+
+      const businessRows = await pool.query('SELECT b.*,t.default_currency FROM businesses b JOIN tenants t ON t.id=b.tenant_id WHERE b.tenant_id=$1 ORDER BY b.created_at,b.id LIMIT 1', [tenantId]);
+      if (businessRows.rowCount) {
+        const row = businessRows.rows[0], setup = row.setup_config ?? {}, payment = setup.payment ?? {}, workflow = setup.workflow ?? {}, whatsappAi = setup.whatsappAi ?? {};
+        sources.push({ id: `business:${row.id}`, type: 'BUSINESS_CONTEXT', title: `${row.name} business context`, content: `${row.name} is a ${human(row.business_subtype || row.business_type)} business. Business type ${human(row.business_type)}. Offering type ${human(row.offering_kind)}. Primary customer workflow ${human(row.workflow_kind)}.${Array.isArray(workflow.workflowKinds) ? ` Supported customer journeys: ${workflow.workflowKinds.map(human).join(', ')}.` : ''}${payment.paymentTiming ? ` Payment timing ${human(payment.paymentTiming)}, deposit ${human(payment.depositType)} ${Number(payment.depositValue ?? 0)}, methods ${(payment.paymentMethods ?? []).map(human).join(', ')}. Policy: ${payment.paymentPolicy ?? ''}` : ''}${whatsappAi.businessSummary ? ` Approved AI role and summary: ${whatsappAi.businessSummary}` : ''} Never substitute terminology or examples from a different industry.` });
+      }
+
+      const broadOfferings = query.topics.some(topic => ['PRICE','SERVICE','PROPERTY','PRODUCT','CAPACITY','AVAILABILITY','PAYMENT'].includes(topic));
+      const offeringRows = await pool.query(`
+        SELECT * FROM business_offerings o
+        WHERE o.tenant_id=$1 AND o.active=true AND ($3::boolean
+          OR EXISTS(SELECT 1 FROM unnest($2::text[]) term(value) WHERE lower(o.name||' '||coalesce(o.description,'')||' '||o.attributes::text) LIKE '%'||term.value||'%'))
+        ORDER BY o.name,o.id LIMIT $4`, [tenantId, terms, broadOfferings, candidateLimit]);
+      for (const row of offeringRows.rows) {
+        const attributes = row.attributes ?? {};
+        let detail = `${human(row.offering_type)} ${row.name}. Price ${money(Number(row.price_minor), row.currency)}. Capacity ${row.capacity}. Deposit ${money(Number(row.deposit_minor), row.currency)}.`;
+        if (row.duration_minutes !== null) detail += ` Duration ${row.duration_minutes} minutes.`;
+        if (row.description) detail += ` ${row.description}`;
+        if (row.offering_type === 'PROPERTY') detail += ` Property ID ${attributes.propertyCode}. Location ${attributes.locationName}. Unit or room type ${attributes.roomType}. Units ${attributes.unitCount ?? 1}. Rooms ${attributes.roomCount ?? attributes.bedrooms}. Maximum guests ${attributes.maxGuests}. Bedrooms ${attributes.bedrooms}. Bathrooms ${attributes.bathrooms}. Amenities ${(attributes.amenities ?? []).join(', ') || 'none listed'}. Private pool ${attributes.privatePool ? 'yes' : 'no'}. Weekday ${money(Number(attributes.weekdayPriceMinor ?? row.price_minor), row.currency)}. Weekend ${money(Number(attributes.weekendPriceMinor ?? row.price_minor), row.currency)}. Public holiday ${money(Number(attributes.publicHolidayPriceMinor ?? row.price_minor), row.currency)}. Peak season ${money(Number(attributes.peakSeasonPriceMinor ?? 0), row.currency)}. Extra guest ${money(Number(attributes.extraGuestChargeMinor ?? 0), row.currency)}. Cleaning fee ${money(Number(attributes.cleaningFeeMinor ?? 0), row.currency)}. Stay ${attributes.minimumNights ?? 1}-${attributes.maximumNights ?? 30} nights. Same-day booking ${attributes.sameDayBooking ? 'allowed' : 'not allowed'}. Check-in ${attributes.checkInTime}; check-out ${attributes.checkOutTime}. Early check-in ${attributes.earlyCheckInAllowed ? 'allowed' : 'not included'}; late check-out ${attributes.lateCheckOutAllowed ? 'allowed' : 'not included'}. Availability: ${attributes.availability}. Booking rules: ${attributes.bookingRules}. Cancellation policy: ${attributes.cancellationPolicy}.`;
+        if (row.offering_type === 'PRODUCT') detail += ` Opening stock ${Number(attributes.stockQuantity ?? 0)}. Preparation time ${Number(attributes.preparationMinutes ?? 0)} minutes.`;
+        if (Array.isArray(attributes.staffNames) && attributes.staffNames.length) detail += ` Assigned team: ${attributes.staffNames.join(', ')}.`;
+        const specific = industryDetails(attributes, row.currency);
+        if (specific) detail += ` Industry details: ${specific}.`;
+        sources.push({ id: `offering:${row.id}`, type: 'OFFERING', title: row.name, content: detail });
+      }
 
       const faqRows = await pool.query(`
         SELECT * FROM ai_faq_entries f

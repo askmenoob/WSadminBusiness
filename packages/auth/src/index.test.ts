@@ -18,18 +18,21 @@ test('staff cannot share treatment records',()=>assert.throws(()=>authorize({use
 
 test('Google login provisions a tenant owner and stores only a session hash',async()=>{
   const writes:any[]=[];
+  let trialProvisioning:any=null;
   const repo:any={
-    async provisionGoogleIdentity(identity:any){return{userId:'u1',email:identity.email,displayName:identity.displayName,role:'TENANT_OWNER',tenantId:'t1',tenantName:'Business One',onboardingCompleted:false};},
+    async provisionGoogleIdentity(identity:any,trial:any){trialProvisioning=trial;return{userId:'u1',email:identity.email,displayName:identity.displayName,role:'TENANT_OWNER',tenantId:'t1',tenantName:'Business One',onboardingCompleted:false,subscriptionStatus:'TRIAL',trialEndsAt:trial.trialEndsAt,trialExpired:false};},
     async createSession(input:any){writes.push(input);},
     async resolveSession(hash:string){return hash===hashSessionToken('x'.repeat(43))?{userId:'u1',email:'owner@example.com',displayName:'Owner',role:'TENANT_OWNER',tenantId:'t1',tenantName:'Business One',onboardingCompleted:false}:null;},
     async deleteSession(){},
   };
-  const service=new AuthenticationService(repo,{sessionTtlMs:60_000,tokenFactory:()=> 'x'.repeat(43),now:()=>new Date('2026-08-29T00:00:00Z')});
+  const service=new AuthenticationService(repo,{sessionTtlMs:60_000,trialDays:10,trialPlanCode:'TRIAL',tokenFactory:()=> 'x'.repeat(43),now:()=>new Date('2026-08-29T00:00:00Z')});
   const result=await service.loginWithGoogle({subject:'google-1',email:'Owner@Example.com',emailVerified:true,displayName:'Owner',avatarUrl:null});
   assert.equal(result.actor.tenantId,'t1');
   assert.equal(result.token,'x'.repeat(43));
   assert.equal(writes[0].tokenHash,hashSessionToken(result.token));
   assert.notEqual(writes[0].tokenHash,result.token);
+  assert.equal(trialProvisioning.planCode,'TRIAL');
+  assert.equal(trialProvisioning.trialEndsAt.toISOString(),'2026-09-08T00:00:00.000Z');
   assert.equal((await service.resolve(result.token))?.email,'owner@example.com');
 });
 

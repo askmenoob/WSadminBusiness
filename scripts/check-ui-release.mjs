@@ -7,6 +7,8 @@ const app = read('apps/web/src/App.tsx');
 const api = read('apps/web/src/api.ts');
 const publicBooking = read('apps/web/src/PublicBookingWorkspace.tsx');
 const aiKnowledge = read('apps/web/src/AIKnowledgeWorkspace.tsx');
+const onboarding = read('apps/web/src/OnboardingWorkspace.tsx');
+const verticals = read('packages/verticals/src/index.ts');
 const entry = read('apps/web/src/main.tsx');
 const styles = read('apps/web/src/styles.css');
 const html = read('apps/web/index.html');
@@ -32,6 +34,13 @@ const checks = [
   ['Skip navigation is present', app.includes('className="skip-link"') && app.includes('id="main-content"')],
   ['Skip navigation stays outside the application grid', app.indexOf('className="skip-link"') < app.indexOf('className="app-shell"')],
   ['Authenticated workspace exposes a visible logout action', app.includes('className="logout-button"') && app.includes('Log out</span>') && styles.includes('.logout-button')],
+  ['Trial state is visible and has an expiry screen', app.includes('className="trial-pill"') && app.includes('TrialExpiredScreen')],
+  ['Setup wizard collects tenant-owned company details', onboarding.includes('Company or business name *') && onboarding.includes('Registration number') && onboarding.includes('Company email *') && onboarding.includes('Contact phone *')],
+  ['Setup wizard is driven by the shared Business Type registry', onboarding.includes('BUSINESS_TYPE_KEYS') && onboarding.includes('getBusinessTypeDefinition')],
+  ['Property setup never reuses salon fields', onboarding.includes('Property ID *') && onboarding.includes('Public holiday price (MYR)') && onboarding.includes('Booking rules *')],
+  ['Industry setup renders registry-specific fields', onboarding.includes('CustomOfferingInput') && verticals.includes("key: 'vehicleInformation'") && verticals.includes("key: 'variants'") && verticals.includes("key: 'classSchedule'")],
+  ['Property setup covers stay pricing and policy', onboarding.includes('Peak season price (MYR)') && onboarding.includes('Minimum nights') && onboarding.includes('Cancellation policy *')],
+  ['Dashboard and navigation consume tenant business context', app.includes("'/business-context'") && app.includes('TailoredOfferingsWorkspace')],
   ['Reduced motion is respected', styles.includes('prefers-reduced-motion:reduce')],
   ['Public booking exposes step state', publicBooking.includes("aria-current={index === step ? 'step'")],
   ['Public booking error is announced', publicBooking.includes('className="public-error" role="alert"')],

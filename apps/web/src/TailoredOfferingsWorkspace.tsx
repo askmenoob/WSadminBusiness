@@ -1,0 +1,21 @@
+import type { TenantBusinessContext } from './api';
+import { getBusinessTypeDefinition, type CustomOfferingField } from '@wsadmin-business/verticals';
+
+const money=(minor:number,currency='MYR')=>new Intl.NumberFormat('en-MY',{style:'currency',currency}).format(minor/100);
+const human=(value:string|null)=>value?value.toLowerCase().replaceAll('_',' ').replace(/\b\w/g,character=>character.toUpperCase()):'Business';
+
+export function TailoredOfferingsWorkspace({context,onNavigate}:{context:TenantBusinessContext;onNavigate:(module:string)=>void}){
+  const rows=context.offerings.filter(row=>row.active),definition=getBusinessTypeDefinition(context.businessType);
+  return <>
+    <header className="page-header"><div><p className="eyebrow">{human(context.businessSubtype)} setup</p><h1>{context.labels.offeringPlural}</h1><p className="muted">This catalogue was built by the setup wizard and is the approved source for the dashboard and AI assistant.</p></div><button className="primary-button" onClick={()=>onNavigate('Onboarding')}>Edit in setup wizard</button></header>
+    <section className="tailored-flow workspace-card"><span>{human(context.businessType)}</span><b>→</b><span>{human(context.businessSubtype)}</span><b>→</b><span>{context.labels.offeringPlural}</span><b>→</b><span>{context.labels.transactionPlural}</span></section>
+    <section className="tailored-offering-grid">{rows.map(row=><article className="workspace-card tailored-offering-card" key={row.id}><div className="tailored-offering-head"><span>{row.offeringType.slice(0,2)}</span><div><p className="eyebrow">{row.offeringType}</p><h2>{row.name}</h2></div><i>{row.active?'Active':'Inactive'}</i></div>{row.description?<p className="muted">{row.description}</p>:null}<div className="detail-grid"><div><small>{row.offeringType==='PROPERTY'?'Weekday price':'Price'}</small><strong>{money(row.priceMinor,row.currency)}</strong></div><div><small>Capacity</small><strong>{row.capacity} {context.labels.customerSingular.toLowerCase()}{row.capacity===1?'':'s'}</strong></div>{row.durationMinutes?<div><small>Duration</small><strong>{row.durationMinutes} min</strong></div>:null}<div><small>Deposit</small><strong>{money(row.depositMinor,row.currency)}</strong></div></div><OfferingAttributes row={row} customFields={definition.customFields}/></article>)}{!rows.length?<article className="workspace-card empty-inline"><strong>No {context.labels.offeringPlural.toLowerCase()} configured</strong><span>Return to Onboarding and complete What do you offer? and Offering details.</span></article>:null}</section>
+  </>;
+}
+
+function displayAttribute(field:CustomOfferingField,value:unknown,currency:string){if(field.type==='BOOLEAN')return value?'Yes':'No';if(field.type==='LIST')return Array.isArray(value)&&value.length?value.join(', '):'Not set';if(field.type==='MONEY')return money(Number(value??0),currency);return String(value??'Not set');}
+function OfferingAttributes({row,customFields}:{row:TenantBusinessContext['offerings'][number];customFields:readonly CustomOfferingField[]}){
+  const data=row.attributes as Record<string,any>;
+  if(row.offeringType==='PROPERTY')return <div className="tailored-attribute-list"><span><b>Location</b>{String(data.locationName??'Not set')}</span><span><b>Unit / room</b>{String(data.roomType??'Not set')} · {Number(data.unitCount??1)} unit · {Number(data.roomCount??0)} room</span><span><b>Stay limits</b>{Number(data.minimumNights??1)}–{Number(data.maximumNights??30)} nights</span><span><b>Check-in / out</b>{String(data.checkInTime??'—')} / {String(data.checkOutTime??'—')}</span><span><b>Amenities</b>{Array.isArray(data.amenities)&&data.amenities.length?data.amenities.join(', '):'None listed'}</span><span><b>Booking rules</b>{String(data.bookingRules??'Not set')}</span><span><b>Cancellation</b>{String(data.cancellationPolicy??'Not set')}</span></div>;
+  return <div className="tailored-attribute-list"><span><b>Assigned team</b>{Array.isArray(data.staffNames)&&data.staffNames.length?data.staffNames.join(', '):'Not assigned'}</span>{Number.isFinite(Number(data.stockQuantity))?<span><b>Stock</b>{Number(data.stockQuantity)}</span>:null}{customFields.map(field=><span key={field.key}><b>{field.label}</b>{displayAttribute(field,data[field.key],row.currency)}</span>)}</div>;
+}

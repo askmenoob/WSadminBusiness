@@ -51,6 +51,8 @@ test('source ranking prefers the named service over broad price candidates', () 
   assert.equal(rankKnowledgeSources(rows, plan, 2)[0]?.id, 'service:facial');
 });
 
+test('tenant business context is always included to prevent cross-industry answers',()=>{const plan=buildKnowledgeQuery('soalan umum');const rows:KnowledgeSource[]=[{id:'business:b1',type:'BUSINESS_CONTEXT',title:'Villa Mawar business context',content:'Homestay booking assistant. Never use salon terminology.'},{id:'service:s1',type:'SERVICE',title:'Facial',content:'Price RM120.'}];assert.deepEqual(rankKnowledgeSources(rows,plan,8).map(row=>row.id),['business:b1']);});
+
 test('grounded FAQ returns answer with source traceability', async () => {
   const router = { async generate(input: any) { assert.match(input.messages[1].content, /RM120/); return { text: 'Harga Facial ialah RM120.00.' }; } };
   const out = await new GroundedFaqService(router as any, new Repo()).answer('tenant-a', 'berapa harga facial?');

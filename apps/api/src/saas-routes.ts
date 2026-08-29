@@ -10,6 +10,7 @@ function fail(reply:FastifyReply,error:unknown){if(error instanceof SaasError){c
 export function registerSaasRoutes(app:FastifyInstance,repo:SaasRepository){
   const onboarding=new OnboardingService(repo),subscriptions=new SubscriptionService(repo),entitlements=new EntitlementService(repo);
   app.get('/api/v1/tenants/:tenantId/onboarding',async(request,reply)=>{const{tenantId}=request.params as any;if(!guard(request,reply,tenantId,'TENANT_READ'))return reply;return onboarding.get(tenantId);});
+  app.get('/api/v1/tenants/:tenantId/business-context',async(request,reply)=>{const{tenantId}=request.params as any;if(!guard(request,reply,tenantId,'TENANT_READ'))return reply;const context=await repo.getBusinessContext(tenantId);return context??reply.code(404).send({error:'business_not_found'});});
   app.put('/api/v1/tenants/:tenantId/onboarding/:step',async(request,reply)=>{const{tenantId,step}=request.params as any;if(!guard(request,reply,tenantId,'SETTINGS_WRITE'))return reply;try{return onboarding.save(tenantId,String(step).toUpperCase(),(request.body??{}) as any);}catch(error){return fail(reply,error);}});
   app.get('/api/v1/plans',async()=>repo.listPlans());
   app.get('/api/v1/tenants/:tenantId/subscription',async(request,reply)=>{const{tenantId}=request.params as any;if(!guard(request,reply,tenantId,'TENANT_READ'))return reply;try{return subscriptions.overview(tenantId,String((request.query as any)?.period??new Date().toISOString().slice(0,7)));}catch(error){return fail(reply,error);}});

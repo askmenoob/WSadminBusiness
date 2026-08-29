@@ -21,9 +21,11 @@ export function authorize(actor:Actor, targetTenantId:string, capability:Capabil
 }
 
 export type GoogleIdentity={subject:string;email:string;emailVerified:boolean;displayName:string|null;avatarUrl:string|null};
-export type AuthenticatedActor={userId:string;email:string;displayName:string|null;role:Role;tenantId?:string;tenantName?:string;onboardingCompleted:boolean};
+export type TenantSubscriptionStatus='TRIAL'|'ACTIVE'|'PAST_DUE'|'CANCELLED';
+export type TrialProvisioning={planCode:string;trialEndsAt:Date};
+export type AuthenticatedActor={userId:string;email:string;displayName:string|null;role:Role;tenantId?:string;tenantName?:string;onboardingCompleted:boolean;subscriptionStatus?:TenantSubscriptionStatus|null;trialEndsAt?:Date|null;trialExpired?:boolean};
 export interface AuthenticationRepository{
-  provisionGoogleIdentity(identity:GoogleIdentity):Promise<AuthenticatedActor>;
+  provisionGoogleIdentity(identity:GoogleIdentity,trial:TrialProvisioning):Promise<AuthenticatedActor>;
   createSession(input:{userId:string;tenantId:string|null;tokenHash:string;expiresAt:Date}):Promise<void>;
   resolveSession(tokenHash:string):Promise<AuthenticatedActor|null>;
   deleteSession(tokenHash:string):Promise<void>;
@@ -32,10 +34,16 @@ export class AuthError extends Error{constructor(message:string,public readonly 
 export function hashSessionToken(token:string){return createHash('sha256').update(token).digest('hex');}
 export class AuthenticationService{
   private readonly sessionTtlMs:number;
+  private readonly trialDays:number;
+  private readonly trialPlanCode:string;
   private readonly tokenFactory:()=>string;
   private readonly now:()=>Date;
-  constructor(private readonly repo:AuthenticationRepository,options:{sessionTtlMs?:number;tokenFactory?:()=>string;now?:()=>Date}={}){
+  constructor(private readonly repo:AuthenticationRepository,options:{sessionTtlMs?:number;trialDays?:number;trialPlanCode?:string;tokenFactory?:()=>string;now?:()=>Date}={}){
     this.sessionTtlMs=options.sessionTtlMs??30*24*60*60_000;
+    this.trialDays=options.trialDays??10;
+    this.trialPlanCode=(options.trialPlanCode??'TRIAL').trim().toUpperCase();
+    if(!Number.isInteger(this.trialDays)||this.trialDays<1||this.trialDays>90)throw new AuthError('Trial days must be an integer from 1 to 90','invalid_trial_configuration');
+    if(!/^[A-Z0-9_-]{2,40}$/.test(this.trialPlanCode))throw new AuthError('Trial plan code is invalid','invalid_trial_configuration');
     this.tokenFactory=options.tokenFactory??(()=>randomBytes(32).toString('base64url'));
     this.now=options.now??(()=>new Date());
   }
@@ -43,10 +51,11 @@ export class AuthenticationService{
     const email=identity.email.trim().toLowerCase();
     if(!identity.emailVerified)throw new AuthError('Google email is not verified','email_not_verified');
     if(!identity.subject.trim()||!email||!email.includes('@'))throw new AuthError('Google identity is incomplete','invalid_google_identity');
-    const actor=await this.repo.provisionGoogleIdentity({...identity,email,displayName:identity.displayName?.trim()||null});
+    const issuedAt=this.now();
+    const actor=await this.repo.provisionGoogleIdentity({...identity,email,displayName:identity.displayName?.trim()||null},{planCode:this.trialPlanCode,trialEndsAt:new Date(issuedAt.getTime()+this.trialDays*24*60*60_000)});
     const token=this.tokenFactory();
     if(token.length<32)throw new AuthError('Session token generator returned an unsafe token','unsafe_session_token');
-    const expiresAt=new Date(this.now().getTime()+this.sessionTtlMs);
+    const expiresAt=new Date(issuedAt.getTime()+this.sessionTtlMs);
     await this.repo.createSession({userId:actor.userId,tenantId:actor.tenantId??null,tokenHash:hashSessionToken(token),expiresAt});
     return{actor,token,expiresAt};
   }
