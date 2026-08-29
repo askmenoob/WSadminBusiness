@@ -94,5 +94,35 @@ export function App(){
 
 function AuthLoading(){return <main className="auth-shell"><section className="auth-card"><div className="brand-mark">WS</div><p className="eyebrow">WSadmin Business</p><h1>Checking secure session…</h1><p className="muted">Preparing the correct tenant workspace.</p></section></main>;}
 function AuthFailure({message}:{message:string}){return <main className="auth-shell"><section className="auth-card"><div className="brand-mark">!</div><p className="eyebrow">Connection issue</p><h1>Unable to verify this session</h1><p className="muted">{message}</p><button className="primary-button" onClick={()=>window.location.reload()}>Try again</button></section></main>;}
-function LoginScreen({configured,trialDays}:{configured:boolean;trialDays:number}){const state=new URLSearchParams(window.location.search).get('auth');return <main className="auth-shell"><section className="auth-card login-card"><div className="brand-mark">WS</div><p className="eyebrow">{trialDays}-day free trial</p><h1>Set up your business</h1><p className="muted">Sign in with a verified Google account, enter your company details and explore WSadmin Business for {trialDays} days. No payment is collected to start.</p>{state&&state!=='success'?<div className="auth-notice">Google sign-in was not completed. Please try again.</div>:null}<a className={`google-login ${configured?'':'disabled'}`} href={configured?'/api/v1/auth/google/start':undefined} aria-disabled={!configured}><span>G</span>Continue with Google</a>{!configured?<small>Google login is awaiting server credentials.</small>:<small>WSadmin never receives your Google password.</small>}</section></main>;}
+function GoogleLogo(){return <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M21.6 12.23c0-.71-.06-1.4-.18-2.07H12v3.92h5.38a4.6 4.6 0 0 1-2 3.02v2.54h3.24c1.9-1.75 2.98-4.32 2.98-7.41Z"/><path fill="#34A853" d="M12 22c2.7 0 4.97-.9 6.62-2.42l-3.24-2.54c-.9.6-2.05.96-3.38.96-2.61 0-4.82-1.76-5.61-4.13H3.04v2.62A10 10 0 0 0 12 22Z"/><path fill="#FBBC05" d="M6.39 13.87A6 6 0 0 1 6.08 12c0-.65.11-1.28.31-1.87V7.51H3.04A10 10 0 0 0 2 12c0 1.61.38 3.14 1.04 4.49l3.35-2.62Z"/><path fill="#EA4335" d="M12 6c1.47 0 2.79.51 3.82 1.5l2.87-2.87A9.62 9.62 0 0 0 12 2a10 10 0 0 0-8.96 5.51l3.35 2.62C7.18 7.76 9.39 6 12 6Z"/></svg>}
+function LoginScreen({configured,trialDays}:{configured:boolean;trialDays:number}){
+  const state=new URLSearchParams(window.location.search).get('auth');
+  return <main className="auth-shell auth-login-shell">
+    <div className="login-layout">
+      <section className="login-story" aria-label="About WSadmin Business">
+        <div className="login-brand"><div className="brand-mark">WS</div><div><strong>WSadmin</strong><span>Business</span></div></div>
+        <div className="login-story-copy">
+          <h1>Your business,<br/>ready to run.</h1>
+          <p>Build the right workspace for your industry, then manage every customer conversation and operation from one place.</p>
+        </div>
+        <ol className="login-benefits">
+          <li><span>01</span><div><strong>Choose your business type</strong><small>Your dashboard adapts to your actual workflow.</small></div></li>
+          <li><span>02</span><div><strong>Configure what you offer</strong><small>Add services, products, properties, pricing and availability.</small></div></li>
+          <li><span>03</span><div><strong>Put WhatsApp AI to work</strong><small>Give customers accurate answers based on your setup.</small></div></li>
+        </ol>
+        <p className="login-story-foot">Built for service businesses in Malaysia</p>
+      </section>
+      <section className="auth-card login-card">
+        <div className="login-card-brand"><div className="brand-mark">WS</div><strong>WSadmin Business</strong></div>
+        <div className="trial-label"><span/>Free {trialDays}-day trial</div>
+        <h2>Set up your business</h2>
+        <p className="muted">Sign in with Google to create your secure tenant workspace. No payment or card is required to start.</p>
+        {state&&state!=='success'?<div className="auth-notice" role="alert">Google sign-in was not completed. Please try again.</div>:null}
+        <a className={`google-login ${configured?'':'disabled'}`} href={configured?'/api/v1/auth/google/start':undefined} aria-disabled={!configured}><GoogleLogo/><span>Continue with Google</span></a>
+        <div className="login-assurance" aria-label="Trial assurances"><span>10-day access</span><span>No card required</span><span>Secure Google sign-in</span></div>
+        {!configured?<small>Google login is awaiting server credentials.</small>:<small>WSadmin never receives or stores your Google password.</small>}
+      </section>
+    </div>
+  </main>;
+}
 function TrialExpiredScreen({trialEndsAt,onLogout}:{trialEndsAt:string|null;onLogout:()=>Promise<void>}){return <main className="auth-shell"><section className="auth-card trial-expired-card"><div className="brand-mark">WS</div><p className="eyebrow">Free trial ended</p><h1>Your WSadmin Business trial has ended</h1><p className="muted">The trial ended {trialEndsAt?new Intl.DateTimeFormat('en-MY',{dateStyle:'long'}).format(new Date(trialEndsAt)):'recently'}. Your company data remains isolated and unchanged. Contact the System Owner when you are ready to reactivate access.</p><button className="secondary-button" onClick={()=>void onLogout()}>Log out</button></section></main>;}
